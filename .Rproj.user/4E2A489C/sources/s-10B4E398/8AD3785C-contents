@@ -80,23 +80,23 @@ tm_shape(krnap) +
 moran.test(krnap$richness, weights)
 ```
 
-try radnomization = F
+try randomization = F
 try different weighting style?
 try greary.test
 
 ```{r}
-lm.morantest(lm(richness~1, krnap), nb2listw(sp.nb, style="B"))
+lm.morantest(lm(richness~1, krnap), weights)
 ```
 
 there exists a saddlepoint approximation, and an exact combinatorial test:
 
 ```{r}
-lm.morantest.exact(lm(richness~1, krnap), nb2listw(sp.nb, style="B"))
+lm.morantest.exact(lm(richness~1, krnap), weights)
 ```
 and if the sample size is too large, a Monte Carlo test as well:
 
 ```{r}
-moran.mc(krnap$richness, nb2listw(sp.nb, style="B"), nsim=999)
+moran.mc(krnap$richness, weights, nsim=999)
 ```
 
 distance-based weights:
@@ -106,6 +106,21 @@ dst <- nbdists(sp.nb, st_coordinates(krnap))
 idw <- lapply(dst, function(x) 1/x)
 dst.weights <- nb2listw(sp.nb, glist = idw, style="B")
 summary(unlist(dst.weights$weights))
-moran.test(krnap$richness, )
+```
+
+```{r}
+moran.test(krnap$richness, dst.weights)
+```
+
+## Local spatial autocorrelation
+
+```{r}
+lm <- localmoran(krnap$richness, weights)
+head(lm)
+```
+```{r}
+krnap$localI <- as.data.frame(lm)$Ii
+tm_shape(krnap) +
+  tm_dots("localI", size=2)
 ```
 

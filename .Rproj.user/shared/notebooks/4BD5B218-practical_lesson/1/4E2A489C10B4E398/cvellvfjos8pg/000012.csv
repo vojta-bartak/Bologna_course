@@ -1,0 +1,5 @@
+"0","tm_shape(krnap) +
+  tm_dots(""localI"", size=2)
+"
+"2","Variable(s) ""localI"" contains positive and negative values, so midpoint is set to 0. Set midpoint = NA to show the full spectrum of the color palette.
+"
