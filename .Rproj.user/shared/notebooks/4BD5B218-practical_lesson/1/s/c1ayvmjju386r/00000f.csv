@@ -1,0 +1,7 @@
+"0","krnap$residual[!is.na(krnap$elev)] <- lm(richness~elev, krnap)$residuals"
+"0","tm_shape(dtm) +"
+"0","  tm_raster(style=""cont"", palette=""Blues"") +"
+"0","  tm_shape(krnap, is.master = T) +"
+"0","  tm_dots(""residual"", size=1)"
+"2","Variable(s) ""residual"" contains positive and negative values, so midpoint is set to 0. Set midpoint = NA to show the full spectrum of the color palette.
+"

@@ -171,3 +171,45 @@ vario <- variogram(richness~1, cutoff = 40000, data = krnap)
 plot(vario)
 ```
 
+```{r}
+covario <- variogram(richness~1, data = krnap, cutoff=40000, covariogram=T)
+tail(covario)
+```
+
+```{r}
+plot(covario)
+```
+```{r}
+plot(covario$dist, covario$gamma/max(covario$gamma))
+```
+
+```{r}
+data.frame(distance = covario$dist, correlation = covario$gamma/max(covario$gamma)) %>% 
+  arrange(desc(correlation)) %>% 
+  "["(2:nrow(.),) %>% 
+  ggplot(aes(x=distance, y=correlation)) +
+  geom_line() +
+  geom_point()
+```
+
+## Residual autocorrelation
+
+```{r}
+krnap$elev <- st_extract(dtm, krnap) %>% pull(1)
+plot(richness~elev, krnap)
+abline(lm(richness~elev, krnap))
+```
+```{r}
+ggplot(krnap, aes(x=elev, y=richness)) +
+  geom_point() +
+  geom_smooth(method="lm", se=T)
+```
+
+```{r}
+krnap$residual[!is.na(krnap$elev)] <- lm(richness~elev, krnap)$residuals
+tm_shape(dtm) +
+  tm_raster(style="cont", palette="Blues") +
+  tm_shape(krnap, is.master = T) +
+  tm_bubbles("residual")
+```
+
