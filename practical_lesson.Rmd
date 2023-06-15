@@ -1,0 +1,111 @@
+---
+title: "Spatial Autocorrelation in Ecological Data"
+author: "Vojta Barták"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Required packages
+
+```{r}
+library(tidyverse)
+library(sf)
+library(stars)
+library(tmap)
+library(spdep)
+library(gstat)
+#library(geoR)
+```
+
+## Loading and visualizing data
+
+```{r}
+krnap <- read.table("data/krnap_richness.csv", sep=",", header=T) %>% 
+  st_as_sf(coords=c("X", "Y"), crs=5514, remove=F)
+dtm <- read_stars("data/dtm_CR_1000.tif")
+```
+
+```{r}
+tmap_mode("view")
+qtm(krnap)
+```
+
+```{r}
+tm_shape(krnap) +
+  tm_dots("richness")
+```
+
+```{r}
+tmap_mode("plot")
+tm_shape(dtm) +
+  tm_raster(style="cont", palette="Blues") +
+  tm_shape(krnap, is.master = T) +
+  tm_dots("richness", size=1) +
+  tm_layout(legend.outside = T)
+```
+
+## Measuring and testing global spatial autocorrelation
+
+```{r}
+sp.nb <- dnearneigh(st_coordinates(krnap), d1=1000, d2=2000)
+plot(sp.nb, coords=st_coordinates(krnap))
+```
+
+```{r}
+weights <- nb2listw(sp.nb, style="B")
+summary(weights)
+summary(unlist(weights$weights))
+```
+
+graphical comparison of the richness and the weighted average of it's neighbors:
+
+```{r}
+mp <- moran.plot(krnap$richness, weights)
+krnap$infl <- mp$is_inf
+tm_shape(krnap) +
+  tm_dots("infl", size = 1)
+mp <- moran.plot(krnap$richness, nb2listw(sp.nb, style="W"))
+krnap$infl <- mp$is_inf
+tm_shape(krnap) +
+  tm_dots("infl", size = 1)
+```
+
+
+
+```{r}
+moran.test(krnap$richness, weights)
+```
+
+try radnomization = F
+try different weighting style?
+try greary.test
+
+```{r}
+lm.morantest(lm(richness~1, krnap), nb2listw(sp.nb, style="B"))
+```
+
+there exists a saddlepoint approximation, and an exact combinatorial test:
+
+```{r}
+lm.morantest.exact(lm(richness~1, krnap), nb2listw(sp.nb, style="B"))
+```
+and if the sample size is too large, a Monte Carlo test as well:
+
+```{r}
+moran.mc(krnap$richness, nb2listw(sp.nb, style="B"), nsim=999)
+```
+
+distance-based weights:
+
+```{r}
+dst <- nbdists(sp.nb, st_coordinates(krnap))
+idw <- lapply(dst, function(x) 1/x)
+dst.weights <- nb2listw(sp.nb, glist = idw, style="B")
+summary(unlist(dst.weights$weights))
+moran.test(krnap$richness, )
+```
+

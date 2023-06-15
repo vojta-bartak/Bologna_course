@@ -1,0 +1,28 @@
+"0","moran.mc(krnap$richness, nb2listw(sp.nb, style=""B""), nsim=999)
+"
+"1","
+"
+"1","	Monte-Carlo simulation of Moran I"
+"1","
+"
+"1","
+"
+"1","data:  "
+"1",""
+"1","krnap$richness 
+weights: nb2listw(sp.nb, style = ""B"")  
+number of simulations + 1: 1000 
+"
+"1",""
+"1","
+"
+"1","statistic = 0.67409, observed rank = 1000, p-value = 0.001"
+"1","
+"
+"1","alternative hypothesis: "
+"1","greater"
+"1",""
+"1","
+"
+"1","
+"
