@@ -80,7 +80,7 @@ tm_shape(krnap) +
 moran.test(krnap$richness, weights)
 ```
 
-try radnomization = F
+try randomization = F
 try different weighting style?
 try greary.test
 
@@ -104,11 +104,70 @@ distance-based weights:
 ```{r}
 dst <- nbdists(sp.nb, st_coordinates(krnap))
 idw <- lapply(dst, function(x) 1/x)
-dst.weights <- nb2listw(sp.nb, glist = idw, style="W")
+dst.weights <- nb2listw(sp.nb, glist = idw, style="B")
 summary(unlist(dst.weights$weights))
 ```
 
 ```{r}
 moran.test(krnap$richness, dst.weights)
+```
+
+## Local spatial autocorrelation
+
+```{r}
+loc.mor <- localmoran(krnap$richness, nb2listw(sp.nb, style = "W"))
+head(loc.mor)
+```
+```{r}
+loc.mor <- localmoran.exact(lm(richness~1, krnap), nb = sp.nb)
+head(as.data.frame(loc.mor))
+```
+
+```{r}
+krnap$local_I <- sapply(loc.mor, function(x) x$estimate)
+krnap$local_p <- sapply(loc.mor, function(x) x$p.value)
+tm_shape(krnap) +
+  tm_dots(c("local_I","local_p"), size=1) +
+  tm_layout(legend.position = c("LEFT","BOTTOM"))
+```
+
+## Correlogram, Variogram, Covariogram
+
+```{r}
+sp.cor <- sp.correlogram(sp.nb, krnap$richness, order=10)
+sp.cor
+```
+
+```{r}
+plot(sp.cor)
+```
+
+```{r}
+sp.cor <- sp.correlogram(sp.nb, krnap$richness, order=10, method = "I")
+sp.cor
+```
+
+```{r}
+plot(sp.cor)
+```
+```{r}
+library(pgirmess)
+sp.cor2 <- correlog(st_coordinates(krnap), krnap$richness, method = "Moran")
+sp.cor2
+```
+
+```{r}
+plot(sp.cor2)
+```
+
+try different nbclass..
+
+```{r}
+variogram(richness~1, data = krnap, cutoff = 40000, cloud=T) %>% plot
+```
+
+```{r}
+vario <- variogram(richness~1, cutoff = 40000, data = krnap)
+plot(vario)
 ```
 

@@ -1,0 +1,6 @@
+"0","tm_shape(krnap) +
+  tm_dots(c(""local_I"",""local_p""), size=1) +
+  tm_layout(legend.position = c(""LEFT"",""BOTTOM""))
+"
+"2","Variable(s) ""local_I"" contains positive and negative values, so midpoint is set to 0. Set midpoint = NA to show the full spectrum of the color palette.
+"
