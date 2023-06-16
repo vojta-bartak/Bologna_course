@@ -1,2 +1,0 @@
-"0","krnap$elev <- st_extract(dtm, krnap) %>% pull(1)"
-"0","plot(richness~elev, krnap)"

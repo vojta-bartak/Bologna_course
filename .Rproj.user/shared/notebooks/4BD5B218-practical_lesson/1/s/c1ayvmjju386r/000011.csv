@@ -1,4 +1,0 @@
-"0","tm_shape(dtm) +"
-"0","  tm_raster(style=""cont"", palette=""Blues"") +"
-"0","  tm_shape(krnap, is.master = T) +"
-"0","  tm_bubbles(""residual"")"

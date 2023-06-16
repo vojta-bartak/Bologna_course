@@ -51,12 +51,12 @@ tm_shape(dtm) +
 ## Measuring and testing global spatial autocorrelation
 
 ```{r}
-sp.nb <- dnearneigh(st_coordinates(krnap), d1=1000, d2=2000)
-plot(sp.nb, coords=st_coordinates(krnap))
+neibs <- dnearneigh(st_coordinates(krnap), d1=1000, d2=2000)
+plot(neibs, coords=st_coordinates(krnap))
 ```
 
 ```{r}
-weights <- nb2listw(sp.nb, style="B")
+weights <- nb2listw(neibs, style="B")
 summary(weights)
 summary(unlist(weights$weights))
 ```
@@ -68,7 +68,7 @@ mp <- moran.plot(krnap$richness, weights)
 krnap$infl <- mp$is_inf
 tm_shape(krnap) +
   tm_dots("infl", size = 1)
-mp <- moran.plot(krnap$richness, nb2listw(sp.nb, style="W"))
+mp <- moran.plot(krnap$richness, nb2listw(neibs, style="W"))
 krnap$infl <- mp$is_inf
 tm_shape(krnap) +
   tm_dots("infl", size = 1)
@@ -102,9 +102,9 @@ moran.mc(krnap$richness, weights, nsim=999)
 distance-based weights:
 
 ```{r}
-dst <- nbdists(sp.nb, st_coordinates(krnap))
+dst <- nbdists(neibs, st_coordinates(krnap))
 idw <- lapply(dst, function(x) 1/x)
-dst.weights <- nb2listw(sp.nb, glist = idw, style="B")
+dst.weights <- nb2listw(neibs, glist = idw, style="B")
 summary(unlist(dst.weights$weights))
 ```
 
@@ -115,11 +115,11 @@ moran.test(krnap$richness, dst.weights)
 ## Local spatial autocorrelation
 
 ```{r}
-loc.mor <- localmoran(krnap$richness, nb2listw(sp.nb, style = "W"))
+loc.mor <- localmoran(krnap$richness, nb2listw(neibs, style = "W"))
 head(loc.mor)
 ```
 ```{r}
-loc.mor <- localmoran.exact(lm(richness~1, krnap), nb = sp.nb)
+loc.mor <- localmoran.exact(lm(richness~1, krnap), nb = neibs)
 head(as.data.frame(loc.mor))
 ```
 
@@ -134,7 +134,7 @@ tm_shape(krnap) +
 ## Correlogram, Variogram, Covariogram
 
 ```{r}
-sp.cor <- sp.correlogram(sp.nb, krnap$richness, order=10)
+sp.cor <- sp.correlogram(neibs, krnap$richness, order=10)
 sp.cor
 ```
 
@@ -143,7 +143,7 @@ plot(sp.cor)
 ```
 
 ```{r}
-sp.cor <- sp.correlogram(sp.nb, krnap$richness, order=10, method = "I")
+sp.cor <- sp.correlogram(neibs, krnap$richness, order=10, method = "I")
 sp.cor
 ```
 
@@ -211,5 +211,44 @@ tm_shape(dtm) +
   tm_raster(style="cont", palette="Blues") +
   tm_shape(krnap, is.master = T) +
   tm_bubbles("residual")
+```
+
+```{r}
+krnap.subset <- na.omit(krnap)
+neibs.res <- dnearneigh(st_coordinates(krnap.subset), d1=1000, d2=2000)
+weights.res <- nb2listw(sp.nb.res, style="B")
+```
+
+
+```{r}
+moran.plot(krnap.subset$residual, weights.res)
+```
+
+
+```{r}
+model <- lm(richness~elev, krnap.subset)
+lm.morantest(model, weights.res)
+```
+
+```{r}
+lm.morantest.exact(model, weights.res)
+```
+
+
+```{r}
+loc.mor.res <- localmoran.exact(model=model, nb=neibs.res)
+krnap.subset$local_I <- sapply(lm.exact.res, function(x) x$estimate)
+krnap.subset$local_p <- sapply(lm.exact.res, function(x) x$p.value)
+tm_shape(krnap.subset) +
+  tm_dots(c("local_I", "local_p"), size=1) +
+  tm_layout(legend.position = c("LEFT","BOTTOM"))
+```
+
+```{r}
+correlog(st_coordinates(krnap.subset), krnap.subset$residual, method = "Moran") %>% plot
+```
+
+```{r}
+variogram(richness~elev, data=krnap.subset, cutoff = 40000) %>% plot
 ```
 

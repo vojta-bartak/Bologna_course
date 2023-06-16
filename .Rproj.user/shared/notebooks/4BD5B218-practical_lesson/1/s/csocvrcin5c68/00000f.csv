@@ -1,7 +1,0 @@
-"0","library(tidyverse)"
-"0","library(sf)"
-"0","library(stars)"
-"0","library(tmap)"
-"0","library(spdep)"
-"0","library(gstat)"
-"0","#library(geoR)"
