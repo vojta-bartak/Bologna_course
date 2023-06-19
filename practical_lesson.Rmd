@@ -70,7 +70,7 @@ neibs <- dnearneigh(st_coordinates(krnap), d1=1000, d2=2000)
 plot(neibs, coords=st_coordinates(krnap))
 ```
 
-> Try different `d1` and `d2` settings and plot the resulting network.
+-> Try different `d1` and `d2` settings and plot the resulting network.
 
 The next step is to define a weight for each neigbour connection, reflecting the strenght of the corresponding spatial relationship. In our case (i.e., continuous data), the best choice is to assign a constant weight of 1 to all connections, because the only reasonable assumption about the spatial dependence is that it decreases with distance, and the role of distance is alrealy incorporated in the definition of neighbors. (Later we will show how the weights could be created directly based on distances.)
 
@@ -100,7 +100,9 @@ moran.test(krnap$richness, weights)
 
 Although the test is based on the Normal approximation, which usually holds unless the sample is not very small, by default the `moran.test` function estimates the variance using a correction for a kurtosis possibly differing from that of the normal distribution. To use the pure normal approximation, we can set `randomization = F` (try it!). 
 
-If we prefer using the Geaty's C instead od Moran's I, we can call `greary.test` (with the same options).
+If we prefer using the Geary's C instead od Moran's I, we can call `greary.test` with the same options.
+
+-> Try to test Geary's C.
 
 An alternative way to perform the Moran test is via the function `lm.morantest`, which tests the autocorrelation in residuals of a (generalized) linear model. Using an intercept-only model, we obtain the same test as before:
 
@@ -120,9 +122,11 @@ In case of larger samples, a Monte Carlo test is available, which is based on th
 moran.mc(krnap$richness, weights, nsim=999)
 ```
 
-Note the larger p value compared to previous tests. It should be understood that for Monte Carlo test, the lowest possible p value is bounded by the number of simulations. With `nsim = 999`, the lowest possible p value is 0.001, which is exactly what we got. This p value should be then interpreted as the maximum one, i.e. the true p value is less than or equal to 0.001. (Try to set the number of simulations to 9999 and see the resulting p value.)
+Note the larger p value compared to previous tests. It should be understood that for Monte Carlo test, the lowest possible p value is bounded by the number of simulations. With `nsim = 999`, the lowest possible p value is 0.001, which is exactly what we got. This p value should be then interpreted as the maximum one, i.e. the true p value is less than or equal to 0.001. 
 
-distance-based weights:
+-> Try to set the number of simulations to 9999 and see the resulting p value.
+
+The weights can also be defined directly based on distance, i.e. as an inverse distance weights. The function `nbdists` is used first to compute the distances between the neighbors. Then, the `lapply` function is used to invert these distances in a loop. Then the function `nb2listw` is used to convert the neighbors to weights, with the parameter `glist` set to the list of inverse distances.
 
 ```{r}
 dst <- nbdists(neibs, st_coordinates(krnap))
@@ -135,16 +139,24 @@ summary(unlist(dst.weights$weights))
 moran.test(krnap$richness, dst.weights)
 ```
 
+As we see, there is almost no difference in the Moran's I and the test, which is not suprising given the fact that the neoghbors are already defined based on distance.
+
 ## Local spatial autocorrelation
+
+So far, we have investigated the global spatial autocorrelation that summarizes the whole spatial pattern into a single number (i.e., the Moran's I value). This is actually based on an underlying assumption of stacionarity, i.e. that the nature of the spatial dependence does not vary over the space. With real data, this is not always the case. To investigate local differences in the pattern of spatial dependence, we can decompose the global Moran's I into its components corresponding to the individual sites. These components are called local Moran's Is, and for each, a similar test as for the global one can be performed.
 
 ```{r}
 loc.mor <- localmoran(krnap$richness, nb2listw(neibs, style = "W"))
 head(loc.mor)
 ```
+Because each local Moran's I is calculated solely based on the few neighbours of a given site, the exact test is much more appropriate in this case.
+
 ```{r}
 loc.mor <- localmoran.exact(lm(richness~1, krnap), nb = neibs)
 head(as.data.frame(loc.mor))
 ```
+
+The local Is and the associated p values can be plotted in a map:
 
 ```{r}
 krnap$local_I <- sapply(loc.mor, function(x) x$estimate)
@@ -154,7 +166,16 @@ tm_shape(krnap) +
   tm_layout(legend.position = c("LEFT","BOTTOM"))
 ```
 
+The interpretation is similar as with the global I: high positive values indicate those sites with species richness highly similar to that of its neighbours; high negative values (rarely present) indicate negatively correlated values; and values near zero indicate sites that are independent from their neighbourhood. The values, however, are no longer bounded in -1 and 1, and the interpretation of the absolute values is unclear. For this reason, it is also useful to depict the p values: the values near 0 indicate sites that are correlated with their neighbourhood, which typically means they have similar richness values. Such areas can be called "clusters". On the other hand, the p values near 1 indicate site that are independent of their neighbourhoods, which often leads to differing richness values and can depict "hotspots". 
+
+It is important to note, however, that the p values should not be taken rigorously as indicators of a "statistical significance", at least because of the problem of multiple testing. Instead, they provide an exploratory information about the dataset.
+
+In our case, we can roughly identify three zones along the elevational gradient: from a cluster of similar values in the south, through differing values in a kind of transition zone, to another cluster of similar values in higher altitudes at the north.
+
+
 ## Correlogram, Variogram, Covariogram
+
+So far, we have investigated the spatial autocorrelation in the scale of the neighbors, i.e. whether or not species richness depends on its values at the 1 to 2 km distance. This is usually not enough. Instead, we want to know what is the actual scale of the spatial dependence, and at what distances the autocorrelation does or does not play a role. To achieve this, we can compute the autocorrelation coefficient (like Moran's I) for multiple distance classes, and plot it against distance. The resulting plot is called correlogram, and it is a very common 
 
 ```{r}
 sp.cor <- sp.correlogram(neibs, krnap$richness, order=10)
@@ -184,6 +205,8 @@ plot(sp.cor2)
 ```
 
 try different nbclass..
+
+In geostatistics, the autocorrelation 
 
 ```{r}
 variogram(richness~1, data = krnap, cutoff = 40000, cloud=T) %>% plot
