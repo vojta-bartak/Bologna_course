@@ -6,22 +6,25 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
 ## Required packages
 
 ```{r}
-library(tidyverse)
-library(sf)
-library(stars)
-library(tmap)
-library(spdep)
-library(gstat)
+library(tidyverse) # General metapackage for manipuating and visualizing data
+library(sf)        # Vector spatial data manipulation and analysis 
+library(stars)     # Raster spatial data manipulation and analysis (compatible with sf)
+library(tmap)      # Spatial data display
+library(spdep)     # Areal data analysis, Moran's I, spatial dependence weighting
+library(gstat)     # Geostatistics
 #library(geoR)
 ```
 
-## Loading and visualizing data
+## Loading and visualizing the data
+
+Let's load the data on bird species richness in the Krkonoše National Park (KRNAP). The survey was done in mapping quadrats of 1.5 km^2 size. The function `st_as_sf` from the `sf` package is used to convert the dataframe into a Single Feature object, i.e. the object with vector spatial data.
+
 
 ```{r}
 krnap <- read.table("data/krnap_richness.csv", sep=",", header=T) %>% 
@@ -29,15 +32,23 @@ krnap <- read.table("data/krnap_richness.csv", sep=",", header=T) %>%
 dtm <- read_stars("data/dtm_CR_1000.tif")
 ```
 
+`tmap` packaghe provides functions to display spatial data and to efficiently produce nice thematic maps. It has two modes. In the default "plot" mode, a static map is produced. In the "view" mode, the map is rendered as an interactive web map on the Open Street Maps basemap (it uses the leaflet library).
+
+The function `qtm` produces a "Quick Thematic Map" from the input data with a minimal code. It is useful for the first quick look at the data.
+
 ```{r}
 tmap_mode("view")
 qtm(krnap)
 ```
 
+For more tuned display, you first call the `tm_shape` specifying the spatial data to be displayed, and then follow (using the ggplot-like `+` notation) with some of the functions specifying what kind of symbols should be used for the layer, what attribute variable should be displayed, and possibly other layer details.
+
 ```{r}
 tm_shape(krnap) +
   tm_dots("richness")
 ```
+
+You can combine multiple layers by chaining them with `+`, each layer beginning with a new `tm_shape` call. The `tm_layout` can be used to control the layout components, like the legend.
 
 ```{r}
 tmap_mode("plot")
@@ -50,10 +61,20 @@ tm_shape(dtm) +
 
 ## Measuring and testing global spatial autocorrelation
 
+Although our data represent aggregated information about the underlying continuous phenomenon (i.e., the bird species richness), to compute the Moran's I, we need to treat them as discrete entities and define their interconnectivity relations (spatial neighbors) and spatial dependence structure (spatial weights). (This is not true for estimating the variogram, as you will see later). 
+
+The first step is to define for each observation, what observations are considered its spatial neoghbors, i.e. having some spatial relationship with it. The function `dnearneigh` defines the neighbors based on their euclidean distance. In the code below, the observation lying between 1 and 2 km from the target observation are considered its neighbours. The resulting network is then plotted.
+
 ```{r}
 neibs <- dnearneigh(st_coordinates(krnap), d1=1000, d2=2000)
 plot(neibs, coords=st_coordinates(krnap))
 ```
+
+> Try different `d1` and `d2` settings and plot the resulting network.
+
+The next step is to define a weight for each neigbour connection, reflecting the strenght of the corresponding spatial relationship. In our case (i.e., continuous data), the best choice is to assign a constant weight of 1 to all connections, because the only reasonable assumption about the spatial dependence is that it decreases with distance, and the role of distance is alrealy incorporated in the definition of neighbors. (Later we will show how the weights could be created directly based on distances.)
+
+The function `nb2listw` converts the neighbours into a list of weights. There are multiple weighting styles, differing in the way how the weights are standardized. the style "B" simply keeps the weights as they are. In our case, each connection has a weight of 1. Another style could be "W", which standardize the weights so that all the weights of each observation sum up to unity. This style is sometimes useful, as we will see very soon. (Other styles are possible, which are not explained here.)
 
 ```{r}
 weights <- nb2listw(neibs, style="B")
@@ -61,43 +82,45 @@ summary(weights)
 summary(unlist(weights$weights))
 ```
 
-graphical comparison of the richness and the weighted average of it's neighbors:
+One possible way to look at the spatial autocorrelation is the so called Moran scatterplot. It is a graphical comparison of the species richness at a site and the weighted sum of the species richness at its neighbours. However, the weighting style makes a difference here. With the "B" style, the weights are all same and so the weighted sum will be smaller for the sites with less neighbours. This is typical for the sites at the boundary of the study area. With the weighting style "W", however, the weights of each site are standardized to unit sum, and so each weighted sum of neighboring values is actually a weighted average. This makes much more sense in this context and overcomes the edge effect we just mentioned. For this reason, we generate the weights again inside the `moran.plot` call, using the "W" style.
 
 ```{r}
-mp <- moran.plot(krnap$richness, weights)
-krnap$infl <- mp$is_inf
-tm_shape(krnap) +
-  tm_dots("infl", size = 1)
-mp <- moran.plot(krnap$richness, nb2listw(neibs, style="W"))
-krnap$infl <- mp$is_inf
-tm_shape(krnap) +
-  tm_dots("infl", size = 1)
+mp <- moran.plot(krnap$richness, listw = nb2listw(neibs, style="W"))
 ```
 
+As you can see, there is clear spatial dependence at the scale of the neighbors. The positive slope of the regression line in the plot suggests that the species richness is obviously correlated with the species richness at the neighboring sites.
 
+Having the neighbours and the corresponding weights defined, we can quantify the spatial autocorrelation by calculating the Moran's I index. It can be also tested by comparing its value with its expected value under the null hypothesis of no spatial autocorrelation. (The expected value is not exactly 0, as one would expect, but it is -1/(n-1), where n is the total number of observations.) If we divide the difference between the observed and expected Moran's I by the square root of it's variance, we obtain a standard deviate that can be compared with the standard normal distribution to obtain a p value.
+
+The test is done using the `moran.test` function from the `spdep` package.
 
 ```{r}
 moran.test(krnap$richness, weights)
 ```
 
-try randomization = F
-try different weighting style?
-try greary.test
+Although the test is based on the Normal approximation, which usually holds unless the sample is not very small, by default the `moran.test` function estimates the variance using a correction for a kurtosis possibly differing from that of the normal distribution. To use the pure normal approximation, we can set `randomization = F` (try it!). 
+
+If we prefer using the Geaty's C instead od Moran's I, we can call `greary.test` (with the same options).
+
+An alternative way to perform the Moran test is via the function `lm.morantest`, which tests the autocorrelation in residuals of a (generalized) linear model. Using an intercept-only model, we obtain the same test as before:
 
 ```{r}
 lm.morantest(lm(richness~1, krnap), weights)
 ```
 
-there exists a saddlepoint approximation, and an exact combinatorial test:
+There are two advantages of this approach. First, we can generalize this to models with covariates (we're gonna do this later). Second, there are versions of the functions providing more robust tests, i.e. without the asymptotic normality assumption. These is `lm.morantest.sad` for the so called "saddlepoint approximantion", and `lm.morantest.exact` for a combinatorial-based exact test. The latter test goes through all the possible permutations of the values, with the positions of sites kept fixed, each time calculating the Moran's I, and then comapring the observed values with the distribution of the values from the permutations. This test is generally best, as it has no distributional assuptions. Because it is computationally intensive, however, it can only be used for small to moderate sample sizes.
 
 ```{r}
 lm.morantest.exact(lm(richness~1, krnap), weights)
 ```
-and if the sample size is too large, a Monte Carlo test as well:
+
+In case of larger samples, a Monte Carlo test is available, which is based on the same principle as the exact test, but instead of going through all the permutations, it randomly sample from them:
 
 ```{r}
 moran.mc(krnap$richness, weights, nsim=999)
 ```
+
+Note the larger p value compared to previous tests. It should be understood that for Monte Carlo test, the lowest possible p value is bounded by the number of simulations. With `nsim = 999`, the lowest possible p value is 0.001, which is exactly what we got. This p value should be then interpreted as the maximum one, i.e. the true p value is less than or equal to 0.001. (Try to set the number of simulations to 9999 and see the resulting p value.)
 
 distance-based weights:
 
@@ -216,7 +239,7 @@ tm_shape(dtm) +
 ```{r}
 krnap.subset <- na.omit(krnap)
 neibs.res <- dnearneigh(st_coordinates(krnap.subset), d1=1000, d2=2000)
-weights.res <- nb2listw(sp.nb.res, style="B")
+weights.res <- nb2listw(neibs.res, style="B")
 ```
 
 
@@ -237,8 +260,8 @@ lm.morantest.exact(model, weights.res)
 
 ```{r}
 loc.mor.res <- localmoran.exact(model=model, nb=neibs.res)
-krnap.subset$local_I <- sapply(lm.exact.res, function(x) x$estimate)
-krnap.subset$local_p <- sapply(lm.exact.res, function(x) x$p.value)
+krnap.subset$local_I <- sapply(loc.mor.res, function(x) x$estimate)
+krnap.subset$local_p <- sapply(loc.mor.res, function(x) x$p.value)
 tm_shape(krnap.subset) +
   tm_dots(c("local_I", "local_p"), size=1) +
   tm_layout(legend.position = c("LEFT","BOTTOM"))

@@ -1,0 +1,1 @@
+"0","mp <- moran.plot(krnap$richness, listw = nb2listw(neibs, style=""W""))"

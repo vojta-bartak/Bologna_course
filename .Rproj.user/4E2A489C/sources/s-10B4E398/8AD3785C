@@ -3,7 +3,7 @@
     "path": "G:/ownCloud/Bologna_course/practical_lesson.Rmd",
     "project_path": "practical_lesson.Rmd",
     "type": "r_markdown",
-    "hash": "0",
+    "hash": "2366318554",
     "contents": "",
     "dirty": false,
     "created": 1686823324160.0,
@@ -13,16 +13,16 @@
         "tempName": "Untitled1",
         "source_window_id": "",
         "Source": "Source",
-        "cursorPosition": "24,0",
-        "scrollLine": "0",
-        "last_setup_crc32": "10B4E398bb338d19"
+        "cursorPosition": "122,450",
+        "scrollLine": "102",
+        "last_setup_crc32": "10B4E39822e527f5"
     },
     "folds": "",
-    "lastKnownWriteTime": 1686847643,
+    "lastKnownWriteTime": 1687175617,
     "encoding": "UTF-8",
     "collab_server": "",
     "source_window": "",
-    "last_content_update": 1686847643635,
+    "last_content_update": 1687175617938,
     "read_only": false,
     "read_only_alternatives": []
 }
