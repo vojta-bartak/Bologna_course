@@ -32,7 +32,7 @@ krnap <- read.table("data/krnap_richness.csv", sep=",", header=T) %>%
 dtm <- read_stars("data/dtm_CR_1000.tif")
 ```
 
-`tmap` packaghe provides functions to display spatial data and to efficiently produce nice thematic maps. It has two modes. In the default "plot" mode, a static map is produced. In the "view" mode, the map is rendered as an interactive web map on the Open Street Maps basemap (it uses the leaflet library).
+`tmap` package provides functions to display spatial data and to efficiently produce nice thematic maps. It has two modes. In the default "plot" mode, a static map is produced. In the "view" mode, the map is rendered as an interactive web map on the Open Street Maps basemap (it uses the leaflet library).
 
 The function `qtm` produces a "Quick Thematic Map" from the input data with a minimal code. It is useful for the first quick look at the data.
 
@@ -63,7 +63,9 @@ tm_shape(dtm) +
 
 Although our data represent aggregated information about the underlying continuous phenomenon (i.e., the bird species richness), to compute the Moran's I, we need to treat them as discrete entities and define their interconnectivity relations (spatial neighbors) and spatial dependence structure (spatial weights). (This is not true for estimating the variogram, as you will see later). 
 
-The first step is to define for each observation, what observations are considered its spatial neoghbors, i.e. having some spatial relationship with it. The function `dnearneigh` defines the neighbors based on their euclidean distance. In the code below, the observation lying between 1 and 2 km from the target observation are considered its neighbours. The resulting network is then plotted.
+### Spatial neighbors
+
+The first step is to define for each observation, what observations are considered its spatial neoghbors, i.e. having some spatial relationship with it. The function `dnearneigh` defines the neighbors based on their euclidean distance. In the code below, the observation lying between 1 and 2 km from the target observation are considered its neighbors. The resulting network is then plotted.
 
 ```{r}
 neibs <- dnearneigh(st_coordinates(krnap), d1=1000, d2=2000)
@@ -72,9 +74,11 @@ plot(neibs, coords=st_coordinates(krnap))
 
 -> Try different `d1` and `d2` settings and plot the resulting network.
 
+### Spatial weights
+
 The next step is to define a weight for each neigbour connection, reflecting the strenght of the corresponding spatial relationship. In our case (i.e., continuous data), the best choice is to assign a constant weight of 1 to all connections, because the only reasonable assumption about the spatial dependence is that it decreases with distance, and the role of distance is alrealy incorporated in the definition of neighbors. (Later we will show how the weights could be created directly based on distances.)
 
-The function `nb2listw` converts the neighbours into a list of weights. There are multiple weighting styles, differing in the way how the weights are standardized. the style "B" simply keeps the weights as they are. In our case, each connection has a weight of 1. Another style could be "W", which standardize the weights so that all the weights of each observation sum up to unity. This style is sometimes useful, as we will see very soon. (Other styles are possible, which are not explained here.)
+The function `nb2listw` converts the neighbors into a list of weights. There are multiple weighting styles, differing in the way how the weights are standardized. the style "B" simply keeps the weights as they are. In our case, each connection has a weight of 1. Another style could be "W", which standardize the weights so that all the weights of each observation sum up to unity. This style is sometimes useful, as we will see very soon. (Other styles are possible, which are not explained here.)
 
 ```{r}
 weights <- nb2listw(neibs, style="B")
@@ -82,7 +86,9 @@ summary(weights)
 summary(unlist(weights$weights))
 ```
 
-One possible way to look at the spatial autocorrelation is the so called Moran scatterplot. It is a graphical comparison of the species richness at a site and the weighted sum of the species richness at its neighbours. However, the weighting style makes a difference here. With the "B" style, the weights are all same and so the weighted sum will be smaller for the sites with less neighbours. This is typical for the sites at the boundary of the study area. With the weighting style "W", however, the weights of each site are standardized to unit sum, and so each weighted sum of neighboring values is actually a weighted average. This makes much more sense in this context and overcomes the edge effect we just mentioned. For this reason, we generate the weights again inside the `moran.plot` call, using the "W" style.
+### Moran scatterplot
+
+One possible way to look at the spatial autocorrelation is the so called Moran scatterplot. It is a graphical comparison of the species richness at a site and the weighted sum of the species richness at its neighbors. However, the weighting style makes a difference here. With the "B" style, the weights are all same and so the weighted sum will be smaller for the sites with less neighbors. This is typical for the sites at the boundary of the study area. With the weighting style "W", however, the weights of each site are standardized to unit sum, and so each weighted sum of neighboring values is actually a weighted average. This makes much more sense in this context and overcomes the edge effect we just mentioned. For this reason, we generate the weights again inside the `moran.plot` call, using the "W" style.
 
 ```{r}
 mp <- moran.plot(krnap$richness, listw = nb2listw(neibs, style="W"))
@@ -90,7 +96,9 @@ mp <- moran.plot(krnap$richness, listw = nb2listw(neibs, style="W"))
 
 As you can see, there is clear spatial dependence at the scale of the neighbors. The positive slope of the regression line in the plot suggests that the species richness is obviously correlated with the species richness at the neighboring sites.
 
-Having the neighbours and the corresponding weights defined, we can quantify the spatial autocorrelation by calculating the Moran's I index. It can be also tested by comparing its value with its expected value under the null hypothesis of no spatial autocorrelation. (The expected value is not exactly 0, as one would expect, but it is -1/(n-1), where n is the total number of observations.) If we divide the difference between the observed and expected Moran's I by the square root of it's variance, we obtain a standard deviate that can be compared with the standard normal distribution to obtain a p value.
+### Global Moran's I
+
+Having the neighbors and the corresponding weights defined, we can quantify the spatial autocorrelation by calculating the Moran's I index. It can be also tested by comparing its value with its expected value under the null hypothesis of no spatial autocorrelation. (The expected value is not exactly 0, as one would expect, but it is -1/(n-1), where n is the total number of observations.) If we divide the difference between the observed and expected Moran's I by the square root of it's variance, we obtain a standard deviate that can be compared with the standard normal distribution to obtain a p value.
 
 The test is done using the `moran.test` function from the `spdep` package.
 
@@ -149,7 +157,7 @@ So far, we have investigated the global spatial autocorrelation that summarizes 
 loc.mor <- localmoran(krnap$richness, nb2listw(neibs, style = "W"))
 head(loc.mor)
 ```
-Because each local Moran's I is calculated solely based on the few neighbours of a given site, the exact test is much more appropriate in this case.
+Because each local Moran's I is calculated solely based on the few neighbors of a given site, the exact test is much more appropriate in this case.
 
 ```{r}
 loc.mor <- localmoran.exact(lm(richness~1, krnap), nb = neibs)
@@ -166,16 +174,20 @@ tm_shape(krnap) +
   tm_layout(legend.position = c("LEFT","BOTTOM"))
 ```
 
-The interpretation is similar as with the global I: high positive values indicate those sites with species richness highly similar to that of its neighbours; high negative values (rarely present) indicate negatively correlated values; and values near zero indicate sites that are independent from their neighbourhood. The values, however, are no longer bounded in -1 and 1, and the interpretation of the absolute values is unclear. For this reason, it is also useful to depict the p values: the values near 0 indicate sites that are correlated with their neighbourhood, which typically means they have similar richness values. Such areas can be called "clusters". On the other hand, the p values near 1 indicate site that are independent of their neighbourhoods, which often leads to differing richness values and can depict "hotspots". 
+The interpretation is similar as with the global I: high positive values indicate those sites with species richness highly similar to that of its neighbors; high negative values (rarely present) indicate negatively correlated values; and values near zero indicate sites that are independent from their neighborhood. The values, however, are no longer bounded in -1 and 1, and the interpretation of the absolute values is unclear. For this reason, it is also useful to depict the p values: the values near 0 indicate sites that are correlated with their neighborhood, which typically means they have similar richness values. Such areas can be called "clusters". On the other hand, the p values near 1 indicate site that are independent of their neighborhoods, which often leads to differing richness values and can depict "hotspots". 
 
 It is important to note, however, that the p values should not be taken rigorously as indicators of a "statistical significance", at least because of the problem of multiple testing. Instead, they provide an exploratory information about the dataset.
 
 In our case, we can roughly identify three zones along the elevational gradient: from a cluster of similar values in the south, through differing values in a kind of transition zone, to another cluster of similar values in higher altitudes at the north.
 
 
-## Correlogram, Variogram, Covariogram
+## Spatial autocorrelation as a function of distance
 
-So far, we have investigated the spatial autocorrelation in the scale of the neighbors, i.e. whether or not species richness depends on its values at the 1 to 2 km distance. This is usually not enough. Instead, we want to know what is the actual scale of the spatial dependence, and at what distances the autocorrelation does or does not play a role. To achieve this, we can compute the autocorrelation coefficient (like Moran's I) for multiple distance classes, and plot it against distance. The resulting plot is called correlogram, and it is a very common 
+### Correlogram
+
+So far, we have investigated the spatial autocorrelation in the scale of the neighbors, i.e. whether or not species richness depends on its values at the 1 to 2 km distance. This is usually not enough. Instead, we want to know what is the actual scale of the spatial dependence, and at what distances the autocorrelation does or does not play a role. To achieve this, we can compute the autocorrelation coefficient (like Moran's I) for multiple distance classes, and plot it against distance. The resulting plot is called correlogram, and it is a very common and efficient exploratory tool.
+
+There are multiple ways how to get the correlogram. The `sp.correlogram` function from the `spdep` package simply computes the Pearson's correlation coefficient for pairs based on different neighbor orders, i.e. first for the neighbors, then for the neighbors of the neighbors, etc. 
 
 ```{r}
 sp.cor <- sp.correlogram(neibs, krnap$richness, order=10)
@@ -186,6 +198,8 @@ sp.cor
 plot(sp.cor)
 ```
 
+From the resulting plot, we can nicely see how the autocorrelation decreases with distance. The disadvantage of using the Pearson's correlation coefficient is that there is no distributional theory applicable for its use in the context of autocorrelation. If we want to add a test for each distance level, we need again use the Moran's I. This can be done by setting `method = I` (`method = C` would provide Geary's C values and tests).
+
 ```{r}
 sp.cor <- sp.correlogram(neibs, krnap$richness, order=10, method = "I")
 sp.cor
@@ -194,6 +208,17 @@ sp.cor
 ```{r}
 plot(sp.cor)
 ```
+
+We see that the autocorrelation is significant up to the eighth order, which roughly correspond to the distance of 8 to 9 km. The p values, however, should be adjusted for mutliple testing. This can be done in the `print` method by setting the `p.adj.method`:
+
+```{r}
+print(sp.cor, p.adj.method = "holm")
+```
+
+We see that the general result is unaltered in this case.
+
+A slightly better looking plot is obtained by the `correlog` function from the package `pgirmess`. The major advantage is that there is directly the distance displayed at the x axis. The red points indicate significant values (without, however, any multiple testing adjustments).
+
 ```{r}
 library(pgirmess)
 sp.cor2 <- correlog(st_coordinates(krnap), krnap$richness, method = "Moran")
@@ -204,13 +229,22 @@ sp.cor2
 plot(sp.cor2)
 ```
 
-try different nbclass..
+The `correlog` function selects automatically the higher distance limit, ca 40 km in this case. Unfortunately, this cannot be changed. We can, however, change the number of distance classes distributed regularly over this range.
 
-In geostatistics, the autocorrelation 
+-> Try to set `nbclass` parameter in the `correlog` function.
+
+### Variogram
+
+In geostatistics, the autocorrelation structure is typically described using the so called variogram instead of correlogram. (Note that what is commonly called variogram should be in fact called semivariogram. The general practice, however, does not distinguish between these two, although in the technical texts this could cause confusion. We follow the general practice here.) 
+
+(Semi)Variogram is defined as (half of) the variance of the differences between the variable values at arbitrary two locations separated by a certain distance. For a given distance, the higher this variance is, the less dependent these values are, et vice versa. This means that the interpretation of variogram is actually exactly opposite from the interpretation of the correlogram.
+
+
 
 ```{r}
 variogram(richness~1, data = krnap, cutoff = 40000, cloud=T) %>% plot
 ```
+
 
 ```{r}
 vario <- variogram(richness~1, cutoff = 40000, data = krnap)

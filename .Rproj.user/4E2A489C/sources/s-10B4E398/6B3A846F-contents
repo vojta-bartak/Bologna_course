@@ -1,0 +1,108 @@
+---
+title: "Modeling autocorrelated data"
+author: "Vojta Barták"
+date: "`r Sys.Date()`"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message= FALSE, warning = FALSE)
+```
+
+- prediction / interpolation
+- corrected effects and their significance
+- 
+
+## Data
+
+### Reading and displaying the data
+
+```{r}
+prec.sf <- st_read("data/precipitation_2014.shp") %>%
+  st_transform(5514) %>%
+  filter(!is.na(Jul))
+summary(prec.sf$Jul)
+```
+
+```{r}
+regions <- st_read("data/kraje.shp")
+tm_shape(regions %>% st_union) +
+  tm_borders() +
+  tm_shape(prec.sf) +
+  tm_bubbles("Jul", title.size="Precipitation (mm)")
+```
+
+```{r}
+dtm <- read_stars("data/dtm_CR_1000.tif")
+tm_shape(dtm) + 
+  tm_raster(style="cont", palette = terrain.colors(12), title = "Elevation (m a.s.l.)") +
+  tm_shape(regions %>% st_union) +
+  tm_borders() +
+  tm_shape(prec.sf) +
+  tm_bubbles(size="Jul", alpha=0, border.col="black", title.size="Precipitation (mm)") +
+  tm_layout(legend.position = c("right","top"))
+```
+
+### Examining the relationship with elevation
+
+```{r}
+prec.sf$elev <- st_extract(dtm, prec.sf) %>% pull(1)
+ggplot(prec.sf, aes(x=elev, y=Jul)) +
+  geom_point() +
+  geom_smooth(se=T) +
+  labs(x="Elevation (m a. s.)", y="Precipitation (mm)")
+```
+
+```{r}
+# linear model
+mod.ols <- lm(Jul~elev, data=prec.sf)
+summary(mod.ols)
+```
+
+```{r}
+# residuals
+prec.sf$resid.ols <- mod.ols$residuals
+prec.sf$resid.ols.abs <- abs(mod.ols$residuals)
+prec.sf$resid.ols.sign <- mod.ols$residuals > 0
+tm_shape(regions %>% st_union) +
+  tm_borders() +
+  tm_shape(prec.sf) +
+  tm_bubbles(size = "resid.ols.abs", title.size = "Abs OLS residuals (mm)", 
+             col = "resid.ols.sign", title.col = "Positive residuals") +
+  tm_shape(prec.sf) +
+  tm_dots() +
+  tm_layout(legend.outside = T)
+```
+
+
+## Generalized least squares
+
+### `gstat` package and kriging
+
+```{r}
+vario <- variogram(Jul~1, prec.sf)
+vario.elev <- variogram(Jul~elev, prec.sf)
+par(mfrow=c(2,1)); plot(vario); plot(vario.elev); par(mfrow=c(1,1))
+
+(vgm.elev = fit.variogram(vario.elev, model = vgm("Sph")))
+plot(vario.elev, vgm.elev)
+
+(vgm.elev = fit.variogram(vario.elev, model = vgm("Exp")))
+plot(vario.elev, vgm.elev)
+```
+
+
+
+### Mixed model approach
+
+## Autoregressive models
+
+## Autocovariate models
+
+## Using space as fixed predictor
+
+### GAMs
+
+### Random Forests
+
+## Moran's eigenvector decomposition
