@@ -17,6 +17,7 @@ library(sf)        # Vector spatial data manipulation and analysis
 library(stars)     # Raster spatial data manipulation and analysis (compatible with sf)
 library(tmap)      # Spatial data display
 library(spdep)     # Areal data analysis, Moran's I, spatial dependence weighting
+library(pgirmess)  # Function correlog
 library(gstat)     # Geostatistics
 #library(geoR)
 ```
@@ -220,7 +221,6 @@ We see that the general result is unaltered in this case.
 A slightly better looking plot is obtained by the `correlog` function from the package `pgirmess`. The major advantage is that there is directly the distance displayed at the x axis. The red points indicate significant values (without, however, any multiple testing adjustments).
 
 ```{r}
-library(pgirmess)
 sp.cor2 <- correlog(st_coordinates(krnap), krnap$richness, method = "Moran")
 sp.cor2
 ```

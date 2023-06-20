@@ -13,6 +13,16 @@ knitr::opts_chunk$set(echo = TRUE, message= FALSE, warning = FALSE)
 - corrected effects and their significance
 - 
 
+```{r}
+library(tidyverse) # General metapackage for manipuating and visualizing data
+library(sf)        # Vector spatial data manipulation and analysis 
+library(stars)     # Raster spatial data manipulation and analysis (compatible with sf)
+library(tmap)      # Spatial data display
+library(gstat)     # Geostatistics
+library(nlme)      # Generalized least squares
+```
+
+
 ## Data
 
 ### Reading and displaying the data
@@ -82,18 +92,133 @@ tm_shape(regions %>% st_union) +
 ```{r}
 vario <- variogram(Jul~1, prec.sf)
 vario.elev <- variogram(Jul~elev, prec.sf)
-par(mfrow=c(2,1)); plot(vario); plot(vario.elev); par(mfrow=c(1,1))
+plot(vario); plot(vario.elev)
+```
 
+```{r}
 (vgm.elev = fit.variogram(vario.elev, model = vgm("Sph")))
 plot(vario.elev, vgm.elev)
+```
 
+```{r}
 (vgm.elev = fit.variogram(vario.elev, model = vgm("Exp")))
 plot(vario.elev, vgm.elev)
 ```
 
+```{r}
+(vgm.elev.zero.nugget = fit.variogram(vario.elev, model = vgm(1.2, "Exp", 50000)))
+plot(vario.elev, vgm.elev.zero.nugget)
+```
 
+
+```{r}
+pred.idw2.0 <- idw(Jul~1, prec.sf, newdata=dtm, idp=2)
+pred.idw0.5 <- idw(Jul~1, prec.sf, newdata=dtm, idp=0.5)
+pred.idw5.0 <- idw(Jul~1, prec.sf, newdata=dtm, idp=5)
+```
+
+```{r}
+plot.idw0.5 <- tm_shape(pred.idw0.5 %>% dplyr::select(var1.pred)) +
+  tm_raster(title="Precip. (mm)") +
+  tm_shape(prec.sf) +
+  tm_dots() +
+  tm_layout(legend.title.size = 1,
+            legend.position = c("RIGHT","TOP"),
+            title = "IDW: p = 0.5",
+            title.size = 1)
+plot.idw2.0 <- tm_shape(pred.idw2.0 %>% dplyr::select(var1.pred)) +
+  tm_raster(title="Precip. (mm)") +
+  tm_shape(prec.sf) +
+  tm_dots() +
+  tm_layout(legend.title.size = 1,
+            legend.position = c("RIGHT","TOP"),
+            title = "IDW: p = 2",
+            title.size = 1)
+plot.idw5.0 <- tm_shape(pred.idw5.0 %>% dplyr::select(var1.pred)) +
+  tm_raster(title="Precip. (mm)") +
+  tm_shape(prec.sf) +
+  tm_dots() +
+  tm_layout(legend.title.size = 1,
+            legend.position = c("RIGHT","TOP"),
+            title = "IDW: p = 5",
+            title.size = 1)
+tmap_arrange(plot.idw0.5,plot.idw2.0,plot.idw5.0)
+```
+
+```{r}
+pred.krig.ord <- krige(Jul~1, prec.sf, newdata=dtm, model=model.const)
+plot.krig.ord <- tm_shape(pred.krig.ord) +
+  tm_raster(title=c("Precipitation (mm)", "Kriging variance")) +
+  tm_shape(prec.sf) +
+  tm_dots() +
+  tm_layout(title = "Ordinary kriging",
+            title.size = 1,
+            legend.position = c("RIGHT","TOP"),)
+plot.krig.ord
+```
+
+```{r}
+names(dtm) <- "elev"
+pred.krig.uni <- krige(Jul~elev, prec.sf, newdata=dtm, model=model.elev)
+plot.krig.uni <- tm_shape(pred.krig.uni) +
+  tm_raster(title=c("Precipitation (mm)", "Kriging variance")) +
+  tm_shape(prec.sf) +
+  tm_dots() +
+  tm_layout(title = "Universal kriging",
+            title.size = 1,
+            legend.position = c("RIGHT","TOP"),)
+tmap_arrange(plot.krig.ord, plot.krig.uni)
+```
 
 ### Mixed model approach
+
+```{r}
+mod.gls <- gls(Jul~elev, data = prec.sf, correlation = corExp(form = ~X+Y, nugget=T))
+summary(mod.gls)
+```
+
+```{r}
+car::Anova(mod.gls)
+# anova(mod.gls, update(mod.gls, ~.-elev))
+```
+
+
+```{r}
+library(sjPlot)
+plot_model(mod.gls, type="eff", terms="elev", show.data = T)
+```
+
+```{r}
+library(performance)
+r2(mod.gls)
+r2(mod.ols)
+```
+
+```{r}
+library(spaMM)
+mod.spaMM <- fitme(Jul~elev+Matern(1|X+Y), data=prec.sf, fixed=list(nu=1.5))  
+summary(mod.spaMM, verbose=T)
+```
+
+```{r}
+drop1(mod.spaMM, test="Chisq")
+fixlrt <- fixedLRT(Jul~1+Matern(1|X+Y), Jul~elev+Matern(1|X+Y),
+                   method="ML", data=prec.sf, ranFix=list(nu=1.5))
+summary(fixlrt,verbose=FALSE)
+```
+
+```{r}
+library(glmmTMB)
+d <- prec.sf %>% mutate(pos = numFactor(prec.sf$X, prec.sf$Y), group = factor(rep(1, nrow(prec.sf))))
+mod.TMB <- glmmTMB(Jul ~ elev + exp(pos + 0 | group), data=d)
+summary(mod.TMB)
+drop1(mod.TMB, test="Chisq")
+```
+
+```{r}
+plot_model(mod.TMB, type="eff", terms="elev", show.data=T)
+```
+
 
 ## Autoregressive models
 

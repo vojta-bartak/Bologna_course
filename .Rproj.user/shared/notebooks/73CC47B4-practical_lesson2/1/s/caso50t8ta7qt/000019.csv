@@ -1,0 +1,5 @@
+"0","plot_model(mod.spaMM, type=""eff"", terms=""elev"", show.data=T)
+"
+"2","Error in n_obs.list(x) : 
+  Cannot find n_obs for this object. Please an open an issue!
+"

@@ -13,6 +13,8 @@ krnap <- read.table("data/krnap_richness.csv", sep=",", header=T) %>%
   mutate(elev = st_extract(dtm, .) %>% pull(1)) %>% 
   na.omit
 
+prec <- read.table
+
 # variogram fitting
 vario <- variogram(richness~1, data=krnap, cutoff = 30000)
 plot(vario)
@@ -30,7 +32,8 @@ plot(vario, vario.fit)
 (vario.fit <- fit.variogram(vario, model=vgm("Mat"), fit.kappa = TRUE))
 plot(vario, vario.fit)
 
+# interpolation
 
+idw <- idw()
 
-
-# kriging
+krige(richness~1, krnap, )
