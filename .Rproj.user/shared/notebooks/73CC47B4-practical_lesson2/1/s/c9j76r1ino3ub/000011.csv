@@ -1,7 +1,0 @@
-"0","ggplot(prec.sf, aes(x=elev, y=Jul)) +
-  geom_point() +
-  geom_smooth(method=""lm"",se=T) +
-  labs(x=""Elevation (m a. s.)"", y=""Precipitation (mm)"")
-"
-"2","`geom_smooth()` using formula 'y ~ x'
-"

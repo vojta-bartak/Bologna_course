@@ -1,0 +1,28 @@
+"0","moran.mc(resid.rf, lw, nsim=999)
+"
+"1","
+"
+"1","	Monte-Carlo simulation of Moran I"
+"1","
+"
+"1","
+"
+"1","data:  "
+"1",""
+"1","resid.rf 
+weights: lw  
+number of simulations + 1: 1000 
+"
+"1",""
+"1","
+"
+"1","statistic = -0.045106, observed rank = 3, p-value = 0.997"
+"1","
+"
+"1","alternative hypothesis: "
+"1","greater"
+"1",""
+"1","
+"
+"1","
+"
