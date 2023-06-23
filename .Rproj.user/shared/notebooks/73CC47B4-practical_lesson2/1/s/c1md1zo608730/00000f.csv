@@ -1,0 +1,30 @@
+"0","prec.sf <- st_read(""data/precipitation_2014.shp"") %>%
+  st_transform(5514) %>%
+  mutate(x = st_coordinates(.)[,1],
+         y = st_coordinates(.)[,2]) %>% 
+  filter(!is.na(Jul))
+"
+"1","Reading layer `"
+"1","precipitation_2014"
+"1","' from data source "
+"1","`"
+"1","G:\ownCloud\Bologna_course\data\precipitation_2014.shp"
+"1","' "
+"1","using driver `"
+"1","ESRI Shapefile"
+"1","'"
+"1","
+"
+"1","Simple feature collection with 639 features and 15 fields"
+"1","
+"
+"1","Geometry type: POINT
+"
+"1","Dimension:     XY
+"
+"1","Bounding box:  "
+"1","xmin: 12.17957 ymin: 48.6175 xmax: 18.83417 ymax: 51.01965"
+"1","
+"
+"1","Geodetic CRS:  WGS 84
+"

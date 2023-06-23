@@ -199,7 +199,7 @@ sp.cor
 plot(sp.cor)
 ```
 
-From the resulting plot, we can nicely see how the autocorrelation decreases with distance. The disadvantage of using the Pearson's correlation coefficient is that there is no distributional theory applicable for its use in the context of autocorrelation. If we want to add a test for each distance level, we need again use the Moran's I. This can be done by setting `method = I` (`method = C` would provide Geary's C values and tests).
+From the resulting plot, we can nicely see how the autocorrelation decreases with distance. The disadvantage of using the Pearson's correlation coefficient is that there is no distributional theory applicable for its use in the context of autocorrelation. If we want to add a test for each distance level, we again need to use the Moran's I. This can be done by setting `method = I` (`method = C` would provide Geary's C values and tests).
 
 ```{r}
 sp.cor <- sp.correlogram(neibs, krnap$richness, order=10, method = "I")

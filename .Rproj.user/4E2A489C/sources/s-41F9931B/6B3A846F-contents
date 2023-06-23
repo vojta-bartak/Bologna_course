@@ -240,10 +240,6 @@ plot_model(mod.TMB, type="eff", terms="elev", show.data=T)
 nb <- knn2nb(knearneigh(st_coordinates(prec.sf), k=12), sym=T)
 lw <- nb2listwdist(nb, prec.sf, type="idw", alpha=1)
 
-mod.SLx <- lmSLx(Jul~elev, data=prec.sf, listw = lw)
-summary(mod.SLx)
-lm.morantest.exact(mod.SLx, lw)
-
 mod.sac <- sacsarlm(Jul~elev, data=prec.sf, listw = lw)
 summary(mod.sac)
 moran.mc(mod.sac$residuals, lw, 999)
@@ -285,7 +281,7 @@ summary(mod.aclm)
 mod.acrf <- ranger(Jul~elev+autocov2, data=prec.sf %>% st_drop_geometry, importance = "impurity")
 mod.acrf$variable.importance
 mod.acrf$prediction.error
-resid.acrf <- mod.rf$predictions - prec.sf$Jul
+resid.acrf <- mod.acrf$predictions - prec.sf$Jul
 moran.mc(resid.acrf, lw, nsim=999)
 ```
 
@@ -322,21 +318,16 @@ vis.gam(mod.gam, view = c("x","y"))
 
 p <- getViz(mod.gam)
 plot(sm(p, 1)) + 
-  l_fitLine(colour = "red") + 
-  l_rug(mapping = aes(x=x, y=y), alpha = 0.8) +
-  l_ciLine(mul = 5, colour = "blue", linetype = 2) + 
-  l_points(shape = 19, size = 1, alpha = 0.1) + 
-  theme_classic()
-
-plot(sm(p, 2)) + 
   l_fitRaster() + 
   l_fitContour() + 
   l_points()
+
+r2(mod.gam)
 ```
 
 
 ```{r}
-mod.gam <- gam(Jul ~ elev + s(x, y, k=100), data=prec.sf %>% st_drop_geometry)
+mod.gam <- gam(Jul ~ s(elev) + s(x, y, k=100), data=prec.sf %>% st_drop_geometry)
 summary(mod.gam)
 moran.mc(mod.gam$residuals, lw, 999)
 
@@ -354,13 +345,9 @@ plot(sm(p, 2)) +
   l_fitRaster() + 
   l_fitContour() + 
   l_points()
-```
 
-```{r}
-qq(p, method = "simul1", a.qqpoi = list("shape" = 1), a.ablin = list("linetype" = 2))
-AIC(mod.gam, update(mod.gam, ~.-elev))
+r2(mod.gam)
 ```
-
 
 ### Random Forests
 
@@ -389,6 +376,8 @@ formula <- paste(c("Jul~elev", paste("eig", 1:ncol(meig$sf), sep="")), collapse 
 mod.meiglm <- lm(formula, data=df) %>% step(trace = 0)
 
 summary(mod.meiglm)
+
+car::vif(mod.meiglm)
 ```
 
 ```{r}

@@ -1,5 +1,60 @@
-"0","library(spmoran)
+"0","library(tidyverse) # General metapackage for manipuating and visualizing data"
+"0","library(sf)        # Vector spatial data manipulation and analysis "
+"0","library(stars)     # Raster spatial data manipulation and analysis (compatible with sf)"
+"0","library(tmap)      # Spatial data display"
+"0","library(spdep)"
+"0","library(SpatialPack)"
+"2","Warning:"
+"2"," package ‘SpatialPack’ was built under R version 4.1.3
+"
+"2","Loading required package: fastmatrix
 "
 "2","Warning:"
-"2"," package ‘spmoran’ was built under R version 4.1.3
+"2"," package ‘fastmatrix’ was built under R version 4.1.3
 "
+"2","
+Attaching package: ‘fastmatrix’
+
+"
+"2","The following object is masked from ‘package:Matrix’:
+
+    lu
+
+"
+"0","library(gstat)     # Geostatistics"
+"0","library(nlme)      # Generalized least squares"
+"0","library(spaMM)"
+"0","library(glmmTMB)"
+"0","library(spatialreg)"
+"0","library(mgcv)"
+"0","library(mgcViz)"
+"2","Warning:"
+"2"," package ‘mgcViz’ was built under R version 4.1.3
+"
+"2","Loading required package: qgam
+"
+"2","Warning:"
+"2"," package ‘qgam’ was built under R version 4.1.3
+"
+"2","Registered S3 method overwritten by 'GGally':
+  method from   
+  +.gg   ggplot2
+"
+"2","Registered S3 method overwritten by 'mgcViz':
+  method from  
+  +.gg   GGally
+"
+"2","
+Attaching package: ‘mgcViz’
+
+"
+"2","The following objects are masked from ‘package:stats’:
+
+    qqline, qqnorm, qqplot
+
+"
+"0","library(ranger)"
+"0","library(spmoran)"
+"0","library(car)"
+"0","library(performance)"
+"0","library(sjPlot)"
