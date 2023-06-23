@@ -1,0 +1,1226 @@
+---
+title: 'Prostorová autokorelace a gaussovské procesy'
+author: "Vojta Barták"
+date: "LS 2022"
+output:
+  beamer_presentation:  
+    incremental: false  
+    theme: "Frankfurt"  
+    colortheme: "beaver"  
+    toc: true   
+    slide_level: 3
+    keep_tex: true
+header-includes: 
+  - \AtBeginSubsection{} 
+  - \def\sectionname{Část}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, cache=T)
+```
+
+# Prostorová autokorelace
+
+## Korelace dvou veličin
+\small
+
+```{r, echo=FALSE, fig.height=1.7, fig.width=2.5}
+library(tidyverse)
+library(mvtnorm)
+m <- c(3.4,5.6)
+s <- matrix(c(1,0.8,0.8,1), ncol = 2)
+xy <- as.data.frame(rmvnorm(100, mean=m, sigma=s))
+ggplot(xy, aes(x=V1, y=V2)) +
+  geom_point(size=0.5) +
+  geom_smooth(method="lm", se=F, color="red", size=0.5) +
+  annotate("segment", 
+           x=c(mean(xy$V1), min(xy$V1)), xend=c(mean(xy$V1), max(xy$V1)), 
+           y=c(min(xy$V2), mean(xy$V2)), yend=c(max(xy$V2), mean(xy$V2)), 
+           lty=2, color="grey50") +
+  labs(x="X", y="Y", title=bquote(r==.(round(cor(xy$V1,xy$V2), 2)))) +
+  theme_bw() +
+  theme(axis.title.x = element_text(hjust = 1),
+        axis.title.y = element_text(hjust = 1, angle=0),
+        plot.title = element_text(hjust = 1, size = 10)) +
+  scale_x_continuous(breaks=c(mean(xy$V1)), labels = c(expression(bar(X)))) +
+  scale_y_continuous(breaks=c(mean(xy$V2)), labels = c(expression(bar(Y))))
+```
+
+Výběrová kovariance: $S_{XY}=\frac{1}{n-1}\sum_i(X_i-\bar{X})(Y_i-\bar{Y})$
+
+Korelační koeficient: $r=\frac{S_{XY}}{S_X S_Y}$, $-1 \le r \le 1$
+
+## Korelace dvou veličin
+\small
+
+[**Matematický model**](https://distill.pub/2019/visual-exploration-gaussian-processes/): $(X,Y) \sim MVN(\boldsymbol\mu, \boldsymbol\Sigma)$
+
+```{r, echo=FALSE, fig.height=1.5, fig.width=2.5}
+data.grid <- expand.grid(V1 = seq(min(xy$V1), max(xy$V1), l=200), V2 = seq(min(xy$V2), max(xy$V2), l=200))
+contours <- cbind(data.grid, prob = dmvnorm(data.grid, mean = m, sigma = s))
+ggplot(xy, aes(x=V1, y=V2)) +
+  geom_point(size=0.5) +
+  geom_contour(data=contours, aes(z=prob), alpha=.5, breaks = seq(min(contours$prob), max(contours$prob), l=10)) +
+  annotate("segment", x=c(mean(xy$V1), min(xy$V1)), xend=c(mean(xy$V1), max(xy$V1)), y=c(min(xy$V2), mean(xy$V2)), yend=c(max(xy$V2), mean(xy$V2)), 
+           lty=2, color="grey50") +
+  theme_bw() +
+  theme(axis.title.x = element_text(hjust = 1),
+        axis.title.y = element_text(hjust = 1, angle=0)) +
+  labs(x="X", y="Y") +
+  scale_x_continuous(breaks=c(mean(xy$V1)), labels = c(expression(bar(X)))) +
+  scale_y_continuous(breaks=c(mean(xy$V2)), labels = c(expression(bar(Y))))
+```
+
+Varianční matice: $\boldsymbol\Sigma=\begin{pmatrix}Var(X) & Cov(X,Y)\\Cov(X,Y) & Var(Y)\end{pmatrix}$
+
+Kovariance: $Cov(X,Y)=E[(X-E(X))(Y-E(Y))]$
+
+Korelační koeficient: $\rho = \frac{Cov(X,Y)}{\sigma(X)\sigma(Y)}$
+
+## Časová autokorelace
+\small
+
+Časová řada:
+
+```{r, echo=F, fig.height=1, fig.width=3}
+t <- read.table("data/P1PKLE01_T_N.csv", header=T, sep=";", dec=",") %>%
+  set_names(c("year","month","day","temperature","a","b","c")) %>%
+  filter(year==1989 & month %in% c(7,8)) %>%
+  mutate(time = as.POSIXct(paste(day,month,year,sep=":"), format="%d:%m:%Y"))
+ggplot(t, aes(x=time, y=temperature)) +
+  geom_line(size=.3) +
+  theme_bw() +
+  labs(x="", y="T (°C)") +
+  theme(axis.title.y = element_text(angle=0, size=8),
+        axis.text = element_text(size=6))
+```
+
+:::{.columns}
+::::{.column}
+
+```{r, echo=F, fig.height=1.7, fig.width=1.7}
+acor <- function(x, lag=1){
+  s2 <- var(na.omit(x))
+  m <- mean(na.omit(x))
+  sum((x[1:(length(x)-lag)]-m)*(x[(lag+1):length(x)]-m), na.rm = T)/((length(x)-lag)*s2)
+}
+df.t <- data.frame(t1 = t$temperature[1:(nrow(t)-1)], t2 = t$temperature[2:nrow(t)])
+ggplot(df.t, aes(x=t1, y=t2)) +
+  geom_point(size=.5) +
+  theme_bw() +
+  theme(axis.title = element_text(size=8),
+        title = element_text(size=7),
+        axis.text = element_text(size=6)) +
+  labs(x=bquote(paste("Teplota v čase ",italic(t))),
+       y=expression(Teplota~v~čase~italic(t)+1),
+       title = bquote(italic(r)==.(round(acor(t$temperature, 1),2))))
+```
+
+::::
+::::{.column}
+
+```{r, echo=F, fig.height=1.7, fig.width=1.7}
+lag <- 3
+ggplot(data.frame(t1 = t$temperature[1:(nrow(t)-lag)], t2 = t$temperature[(lag+1):nrow(t)]), 
+       aes(x=t1, y=t2)) +
+  geom_point(size=.5) +
+  theme_bw() +
+  theme(axis.title = element_text(size=8),
+        title = element_text(size=7),
+        axis.text = element_text(size=6)) +
+  labs(x=bquote(paste("Teplota v čase ",italic(t))),
+       y=bquote(Teplota~v~čase~italic(t)+.(lag)),
+       title = bquote(italic(r)==.(round(acor(t$temperature, lag),2))))
+```
+
+::::
+:::
+
+## Časová autokorelace
+\small
+
+Časová řada:
+
+```{r, echo=F, fig.height=1, fig.width=3}
+ggplot(t, aes(x=time, y=temperature)) +
+  geom_line(size=.3) +
+  theme_bw() +
+  labs(x="", y="T (°C)") +
+  theme(axis.title.y = element_text(angle=0, size=8),
+        axis.text = element_text(size=6))
+```
+
+Korelace jako funkce časového intervalu:
+
+```{r, echo=F, fig.height=1, fig.width=3}
+tac <- sapply(0:15, function(lag) acor(t$temperature, lag))
+ggplot(data.frame(r=tac, lag=0:15), aes(x=lag, y=r)) +
+  geom_line(size=.3) +
+  geom_point(size=.3) +
+  theme_bw() +
+  labs(x="Časový interval", y=expression(italic(r))) +
+  theme(axis.title = element_text(angle=0, size=8),
+        axis.text = element_text(size=6))
+```
+
+- Předpoklad: časová řada je (tzv. slabě) **stacionární**!
+
+## Prostorová autokorelace
+\small
+
+Měření v prostoru:
+
+```{r, echo=F, out.height="30%"}
+library(stars)
+library(sf)
+library(raster)
+ras <- read_stars("data/dtm_CR.tif") %>%
+  st_set_crs(5514) %>%
+  st_crop(st_read("data/ArcCR500/AdministrativniCleneni_v13.gdb","ObcePolygony", quiet=T) %>% 
+            "["(400,))
+#  as("Raster") %>%
+#  persp(theta=120, phi=400, box=F, expand=0.3)
+knitr::include_graphics("terrain2.png")
+```
+
+::::{.columns}
+:::{.column}
+
+```{r, echo=F, fig.height=1.7, fig.width=1.7}
+#xy <- expand.grid(x = seq(st_bbox(ras)[1]+100,st_bbox(ras)[3]-100, l=20),
+#                  y = seq(st_bbox(ras)[2]+100,st_bbox(ras)[4]-100, l=20))
+#xy$z <- st_extract(ras, as.matrix(xy))[,1]
+#xy <- filter(xy, !is.na(z))
+#p <- persp(z=ras[[1]], theta=100, phi=400, box=F, expand=0.3)
+#p <- persp(as(ras, "Raster"), theta=100, phi=400, box=F, expand=0.3)
+#mypoints <- trans3d(xy$x,xy$y,xy$z,pmat = p)
+#points(mypoints,pch = 16,col = 2)
+xy <- expand.grid(x = seq(st_bbox(ras)[1]+500,st_bbox(ras)[3]-500, l=10),
+                  y = seq(st_bbox(ras)[2]+500,st_bbox(ras)[4]-500, l=10))
+xy$z <- st_extract(ras, as.matrix(xy))[,1]
+xy <- filter(xy, !is.na(z))
+acf2 <- function(lag){
+  shift <- matrix(c(rep(50, nrow(xy)), rep(0, nrow(xy))), ncol = 2)
+  shift.x <- sample(c(0,lag),size = nrow(xy), replace = T)
+  shift.y <- lag-shift.x
+  shift <- matrix(c(shift.x,shift.y), ncol = 2)
+  xy$z2 <- st_extract(ras, as.matrix(xy[,1:2])+shift)[,1]
+  s2 <- var(na.omit(c(xy$z, xy$z2)))
+  m <- mean(na.omit(c(xy$z, xy$z2)))
+  sum((xy$z-m)*(xy$z2-m), na.rm = T)/((nrow(xy)-1)*s2)
+}
+#lags <- seq(50,1000,50)
+#plot(lags, sapply(lags, acf2), type="l")
+lag=100
+shift.x <- sample(c(0,lag),size = nrow(xy), replace = T)
+shift.y <- lag-shift.x
+shift <- matrix(c(shift.x,shift.y), ncol = 2)
+xy$z2 <- st_extract(ras, as.matrix(xy[,1:2])+shift)[,1]
+s2 <- var(na.omit(c(xy$z, xy$z2)))
+m <- mean(na.omit(c(xy$z, xy$z2)))
+corr <- sum((xy$z-m)*(xy$z2-m), na.rm = T)/((nrow(xy)-1)*s2)
+ggplot(xy, aes(x=z, y=z2)) +
+  geom_point(size=.5) +
+  theme_bw() +
+  theme(axis.title = element_text(size=8),
+        title = element_text(size=7),
+        axis.text = element_text(size=6)) +
+  labs(x="Měření v nějakém místě",
+       y="Měření 100 m vedle",
+       title = bquote(italic(r)==.(round(corr, 2))))
+```
+
+:::
+:::{.column}
+```{r, echo=F, fig.height=1.7, fig.width=1.7}
+xy <- expand.grid(x = seq(st_bbox(ras)[1]+500,st_bbox(ras)[3]-500, l=10),
+                  y = seq(st_bbox(ras)[2]+500,st_bbox(ras)[4]-500, l=10))
+xy$z <- st_extract(ras, as.matrix(xy))[,1]
+xy <- filter(xy, !is.na(z))
+lag=1000
+shift.x <- sample(c(0,lag),size = nrow(xy), replace = T)
+shift.y <- lag-shift.x
+shift <- matrix(c(shift.x,shift.y), ncol = 2)
+xy$z2 <- st_extract(ras, as.matrix(xy[,1:2])+shift)[,1]
+s2 <- var(na.omit(c(xy$z, xy$z2)))
+m <- mean(na.omit(c(xy$z, xy$z2)))
+corr <- sum((xy$z-m)*(xy$z2-m), na.rm = T)/((nrow(xy)-1)*s2)
+ggplot(xy, aes(x=z, y=z2)) +
+  geom_point(size=.5) +
+  theme_bw() +
+  theme(axis.title = element_text(size=8),
+        title = element_text(size=7),
+        axis.text = element_text(size=6)) +
+  labs(x="Měření v nějakém místě",
+       y="Měření 1000 m vedle",
+       title = bquote(italic(r)==.(round(corr, 2))))
+```
+:::
+::::
+
+
+## Prostorová autokorelace
+\small
+
+Měření v prostoru:
+
+```{r, echo=F, out.height="30%"}
+library(stars)
+library(sf)
+library(raster)
+ras <- read_stars("data/dtm_CR.tif") %>%
+  st_set_crs(5514) %>%
+  st_crop(st_read("data/ArcCR500/AdministrativniCleneni_v13.gdb","ObcePolygony", quiet=T) %>% 
+            "["(400,))
+#  as("Raster") %>%
+#  persp(theta=120, phi=400, box=F, expand=0.3)
+knitr::include_graphics("terrain2.png")
+```
+
+Korelace jako funkce vzdálenosti:
+
+```{r, echo=F, fig.height=1, fig.width=3}
+lags <- seq(0, 1000, 100)
+tac <- sapply(lags, acf2)
+ggplot(data.frame(r=tac, lag=lags), aes(x=lag, y=r)) +
+  geom_line(size=.3) +
+  geom_point(size=.3) +
+  theme_bw() +
+  labs(x="Vzdálenost mezi měřeními", y=expression(italic(r))) +
+  theme(axis.title = element_text(angle=0, size=8),
+        axis.text = element_text(size=6))
+```
+
+- Předpoklad: prostorový proces je **stacionární** a **izotropní**!
+
+# Gaussovské procesy
+
+## Gaussovský (prostorový náhodný) proces
+\small
+
+**Gaussovský proces**: $\left\{S(x):x\in \mathbb{R}^2\right\}$
+
+Pro jakékoli $x_1,x_2,...,x_n$ platí $\left\{S(x_1),S(x_2),...,S(x_3)\right\}\sim MVN(\boldsymbol\mu, \boldsymbol\Sigma)$
+
+- $\mu(x) = E\left[S(x)\right]$ ... funkce střední hodnoty
+
+- $\gamma(x,x')=Cov\left(S(x),S(x')\right)$ ... kovarianční funkce
+
+
+*Příklady*:
+
+1. $\gamma(x,x')= \left\{\begin{array}{ll}0 & pro~x \ne x' \\ \sigma^2 & pro~x=x'\\\end{array}\right.$
+
+<br>
+
+<br>
+
+2. $\gamma(x,x')= \left\{\begin{array}{ll}0 & pro~x \ne x' \\ \sigma^2(x) & pro~x=x'\\\end{array}\right.$
+
+<br>
+
+<br>
+
+3. $\gamma(x,x')= \gamma(u)$, kde $u=|x-x'|$
+
+## Gaussovský (prostorový náhodný) proces
+\small
+Pokud $\mu(x)=\mu$ a $\gamma(x,x')=\gamma(u)$ &rarr; *stacionární, izotropní proces*
+
+Pak lze definovat:
+
+- $\sigma^2=\gamma(0)$ ... (konstantní) rozptyl procesu
+
+<br>
+
+<br>
+
+- $\rho(u)=\gamma(u)/\sigma^2$ ... **korelační funkce**
+
+Procesy definované pomocí $\rho(u)$ a $\sigma^2$ se používají jako modely pro geostatistická data:
+
+- určí se parametrická forma $\rho(u)$ a odhadnou se její parametry (včetně $\sigma^2$)
+- $\rho(u)$ se použije k predikci $S(x)$ v místě (či místech) $x$, kde chybí měření (inteprolace)
+- pokud neplatí $\mu(x) = \mu$, odhadne se nejdřív $\mu(x)$ a pak se pracuje s procesem $S(x)-\mu(X)$
+
+## Mocninně exponenciální třída
+\large
+
+$$\rho(u)=exp\left\{-\left(\frac{u}{\phi}\right)^\kappa\right\}$$
+
+\small
+$\phi$ ... scale, $\phi>0$
+
+$\kappa$ ... shape, $0<\kappa\le 2$
+
+::::{.columns}
+:::{.column width="50%"}
+```{r, echo=F, fig.height=8}
+pex <- function(x, nu, phi){ifelse(x==0, 1, exp(-(x/phi)^nu))}
+x <- seq(0, 1.5, l=200)
+data.frame(
+  x=rep(x,3),
+  y = c(
+    pex(x, 0.7, 0.16),
+    pex(x, 1.0, 0.25),
+    pex(x, 2.0, 0.43)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x)), rep("m3", length(x))),
+          levels=c("m1","m2","m3"))) %>%
+  ggplot(aes(x=x,y=y,lty=model)) + 
+  geom_line(size=2) +
+  scale_linetype_manual(values=1:3, 
+                        labels = c(bquote(kappa==0.7~~phi==0.16),
+                                   bquote(kappa=="1.0"~~phi==0.25),
+                                   bquote(kappa=="2.0"~~phi==0.43))) +
+  labs(linetype="", x=bquote(u), y=bquote(rho(u))) +
+  theme_bw() +
+  theme(legend.position = c(.7,.7),
+        axis.title = element_text(size=30),
+        title = element_text(size=28),
+        axis.text = element_text(size=26),
+        legend.text = element_text(size=30),
+        legend.key.width = unit(2,"cm"))
+```
+
+:::
+:::{.column width="50%"}
+```{r, echo=F, fig.height=8}
+pex <- function(x, nu, phi){ifelse(x==0, 1, exp(-(x/phi)^nu))}
+x <- seq(0, 1.5, l=200)
+data.frame(
+  x=rep(x,3),
+  y = c(
+    pex(x, 0.7, 0.1),
+    pex(x, 0.7, 0.2),
+    pex(x, 0.7, 0.3)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x)), rep("m3", length(x))),
+          levels=c("m1","m2","m3"))) %>%
+  ggplot(aes(x=x,y=y,lty=model)) + 
+  geom_line(size=2) +
+  scale_linetype_manual(values=1:3, 
+                        labels = c(bquote(kappa==0.7~~phi==0.1),
+                                   bquote(kappa==0.7~~phi==0.2),
+                                   bquote(kappa==0.7~~phi==0.3))) +
+  labs(linetype="", x=bquote(u), y=bquote(rho(u))) +
+  theme_bw() +
+  theme(legend.position = c(.7,.7),
+        axis.title = element_text(size=30),
+        title = element_text(size=28),
+        axis.text = element_text(size=26),
+        legend.text = element_text(size=30),
+        legend.key.width = unit(2,"cm"))
+```
+:::
+::::
+
+## Mocninně exponenciální třída
+\large
+
+$$\rho(u)=exp\left\{-\left(\frac{u}{\phi}\right)^\kappa\right\}$$
+
+\small
+$\phi$ ... scale, $\phi>0$
+
+$\kappa$ ... shape, $0<\kappa\le 2$
+
+```{r, echo=F, fig.height=4}
+library(RandomFields)
+n <- 400
+set.seed(1)
+m1 <-  RMpoweredexp(alpha=0.7, var = 1, scale = 0.16) %>%
+  RFsimulate(x=seq(0,1,l=n), grid = F) %>%
+  slot("data") %>%
+  dplyr::pull(variable1)
+set.seed(1)
+m2 <- RMpoweredexp(alpha=1, var = 1, scale = 0.25) %>%
+  RFsimulate(x=seq(0,1,l=n), grid = F) %>%
+  slot("data") %>%
+  dplyr::pull(variable1)
+set.seed(1)
+m3 <- RMpoweredexp(alpha=2, var = 1, scale = 0.43) %>%
+  RFsimulate(x=seq(0,1,l=n), grid = F) %>%
+  slot("data") %>%
+  dplyr::pull(variable1)
+data.frame(m1=m1,  m2=m2, m3=m3, x = seq(0,1,l=n)) %>%
+  pivot_longer(1:3) %>%
+  ggplot(aes(x=x, y=value, lty=name)) +
+  geom_line(size=.5) +
+  theme_bw() +
+  labs(x="x", y="S(x)", linetype="") +
+  scale_linetype_manual(values=c(2,1,3),
+                        labels = c(bquote(kappa==0.7~~phi==0.16),
+                                   bquote(kappa=="1.0"~~phi==0.25),
+                                   bquote(kappa=="2.0"~~phi==0.43))) +
+  theme(legend.position = c(.8,.2))
+```
+
+## Mocninně exponenciální třída
+\small
+
+::::{.columns}
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+library(tmap)
+RMpoweredexp(alpha=1, var = 1, scale = 1) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1~~phi==1),
+            title.size = 3)
+```
+```{r, echo=F, fig.height=9}
+RMpoweredexp(alpha=1, var = 1, scale = 5) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1~~phi==5),
+            title.size = 3)
+```
+
+:::
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+RMpoweredexp(alpha=1, var = 1, scale = 10) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1~~phi==10),
+            title.size = 3)
+```
+
+```{r, echo=F, fig.height=9}
+RMpoweredexp(alpha=1, var = 1, scale = 25) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1~~phi==25),
+            title.size = 3)
+```
+:::
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+RMpoweredexp(alpha=1, var = 1, scale = 50) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1~~phi==50),
+            title.size = 3)
+```
+
+```{r, echo=F, fig.height=9}
+RMpoweredexp(alpha=1, var = 1, scale = 100) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1~~phi==100),
+            title.size = 3)
+```
+:::
+::::
+
+## Mocninně exponenciální třída
+\small
+
+::::{.columns}
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+library(tmap)
+RMpoweredexp(alpha=2, var = 1, scale = 1) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2~~phi==1),
+            title.size = 3)
+```
+```{r, echo=F, fig.height=9}
+RMpoweredexp(alpha=2, var = 1, scale = 5) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2~~phi==5),
+            title.size = 3)
+```
+
+:::
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+RMpoweredexp(alpha=2, var = 1, scale = 10) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2~~phi==10),
+            title.size = 3)
+```
+
+```{r, echo=F, fig.height=9}
+RMpoweredexp(alpha=2, var = 1, scale = 25) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2~~phi==25),
+            title.size = 3)
+```
+:::
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+RMpoweredexp(alpha=2, var = 1, scale = 50) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2~~phi==50),
+            title.size = 3)
+```
+
+```{r, echo=F, fig.height=9}
+RMpoweredexp(alpha=2, var = 1, scale = 100) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2~~phi==100),
+            title.size = 3)
+```
+:::
+::::
+
+## Matérnova třída
+\large
+
+$$\rho(u)=\{2^{\kappa-1}\Gamma(\kappa)\}^{-1}\left(\frac{u}{\phi}\right)^\kappa K_\kappa\left(\tfrac{u}{\phi}\right)$$
+
+\small
+$\phi$ ... scale, $\phi>0$
+
+$\kappa$ ... order, $\kappa>0$
+
+$K_\kappa$ ... modifikovaná Besselova funkce druhého typu řádu $\kappa$
+
+::::{.columns}
+:::{.column width="50%"}
+```{r, echo=F, fig.height=8}
+matt <- function(x, nu, phi){ifelse(x==0, 1,(2^(1-nu))*(gamma(nu)^(-1))*(x/phi)^nu*besselK((x/phi), nu))}
+x <- seq(0, 1.5, l=200)
+data.frame(
+  x=rep(x,3),
+  y = c(
+    matt(x, 0.5, 0.25),
+    matt(x, 1.5, 0.16),
+    matt(x, 2.5, 0.13)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x)), rep("m3", length(x))),
+          levels=c("m1","m2","m3"))) %>%
+  ggplot(aes(x=x,y=y,lty=model)) + 
+  geom_line(size=2) +
+  scale_linetype_manual(values=1:3, 
+                        labels = c(bquote(kappa==0.5~~phi==0.16),
+                                   bquote(kappa==1.5~~phi==0.25),
+                                   bquote(kappa==2.5~~phi==0.43))) +
+  labs(linetype="", x=bquote(u), y=bquote(rho(u))) +
+  theme_bw() +
+  theme(legend.position = c(.7,.7),
+        axis.title = element_text(size=30),
+        title = element_text(size=28),
+        axis.text = element_text(size=26),
+        legend.text = element_text(size=30),
+        legend.key.width = unit(2,"cm"))
+```
+:::
+:::{.column width="50%"}
+```{r, echo=F, fig.height=8}
+matt <- function(x, nu, phi){ifelse(x==0, 1,(2^(1-nu))*(gamma(nu)^(-1))*(x/phi)^nu*besselK((x/phi), nu))}
+x <- seq(0, 1.5, l=200)
+data.frame(
+  x=rep(x,3),
+  y = c(
+    matt(x, 1.5, 0.1),
+    matt(x, 1.5, 0.2),
+    matt(x, 1.5, 0.3)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x)), rep("m3", length(x))),
+          levels=c("m1","m2","m3"))) %>%
+  ggplot(aes(x=x,y=y,lty=model)) + 
+  geom_line(size=2) +
+  scale_linetype_manual(values=1:3, 
+                        labels = c(bquote(kappa==1.5~~phi==0.1),
+                                   bquote(kappa==1.5~~phi==0.2),
+                                   bquote(kappa==1.5~~phi==0.3))) +
+  labs(linetype="", x=bquote(u), y=bquote(rho(u))) +
+  theme_bw() +
+  theme(legend.position = c(.7,.7),
+        axis.title = element_text(size=30),
+        title = element_text(size=28),
+        axis.text = element_text(size=26),
+        legend.text = element_text(size=30),
+        legend.key.width = unit(2,"cm"))
+```
+:::
+::::
+
+## Matérnova třída
+\large
+
+$$\rho(u)=\{2^{\kappa-1}\Gamma(\kappa)\}^{-1}\left(\frac{u}{\phi}\right)^\kappa K_\kappa\left(\tfrac{u}{\phi}\right)$$
+
+\small
+$\phi$ ... scale, $\phi>0$
+
+$\kappa$ ... order, $\kappa>0$
+
+$K_\kappa$ ... modifikovaná Besselova funkce druhého typu řádu $\kappa$
+
+```{r, echo=F, fig.height=4}
+n <- 400
+set.seed(1)
+m1 <-  RMwhittle(nu=0.5, var = 1, scale = 0.25) %>%
+  RFsimulate(x=seq(0,1,l=n), grid = F) %>%
+  slot("data") %>%
+  dplyr::pull(variable1)
+set.seed(1)
+m2 <- RMwhittle(nu=1.5, var = 1, scale = 0.16) %>%
+  RFsimulate(x=seq(0,1,l=n), grid = F) %>%
+  slot("data") %>%
+  dplyr::pull(variable1)
+set.seed(1)
+m3 <- RMwhittle(nu=2.5, var = 1, scale = 0.13) %>%
+  RFsimulate(x=seq(0,1,l=n), grid = F) %>%
+  slot("data") %>%
+  dplyr::pull(variable1)
+data.frame(m1=m1,  m2=m2, m3=m3, x = seq(0,1,l=n)) %>%
+  pivot_longer(1:3) %>%
+  ggplot(aes(x=x, y=value, lty=name)) +
+  geom_line(size=.5) +
+  theme_bw() +
+  labs(x="x", y="S(x)", linetype="") +
+  scale_linetype_manual(values=c(2,1,3),
+                        labels = c(bquote(kappa==0.5~~phi==0.25),
+                                   bquote(kappa==1.5~~phi==0.16),
+                                   bquote(kappa==2.5~~phi==0.13))) +
+  theme(legend.position = c(.8,.2))
+```
+
+## Matérnova třída
+\small
+
+::::{.columns}
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+library(tmap)
+RMwhittle(nu=0.5, var = 1, scale = 1) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==0.5~~phi==1),
+            title.size = 3)
+```
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=0.5, var = 1, scale = 5) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==0.5~~phi==5),
+            title.size = 3)
+```
+
+:::
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=0.5, var = 1, scale = 10) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==0.5~~phi==10),
+            title.size = 3)
+```
+
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=0.5, var = 1, scale = 25) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==0.5~~phi==25),
+            title.size = 3)
+```
+:::
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=0.5, var = 1, scale = 50) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==0.5~~phi==50),
+            title.size = 3)
+```
+
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=0.5, var = 1, scale = 100) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==0.5~~phi==100),
+            title.size = 3)
+```
+:::
+::::
+
+## Matérnova třída
+\small
+
+::::{.columns}
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+library(tmap)
+RMwhittle(nu=1.5, var = 1, scale = 1) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1.5~~phi==1),
+            title.size = 3)
+```
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=1.5, var = 1, scale = 5) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1.5~~phi==5),
+            title.size = 3)
+```
+
+:::
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=1.5, var = 1, scale = 10) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1.5~~phi==10),
+            title.size = 3)
+```
+
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=1.5, var = 1, scale = 25) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1.5~~phi==25),
+            title.size = 3)
+```
+:::
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=1.5, var = 1, scale = 50) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1.5~~phi==50),
+            title.size = 3)
+```
+
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=1.5, var = 1, scale = 100) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==1.5~~phi==100),
+            title.size = 3)
+```
+:::
+::::
+
+## Matérnova třída
+\small
+
+::::{.columns}
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+library(tmap)
+RMwhittle(nu=2.5, var = 1, scale = 1) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2.5~~phi==1),
+            title.size = 3)
+```
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=2.5, var = 1, scale = 5) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2.5~~phi==5),
+            title.size = 3)
+```
+
+:::
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=2.5, var = 1, scale = 10) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2.5~~phi==10),
+            title.size = 3)
+```
+
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=2.5, var = 1, scale = 25) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2.5~~phi==25),
+            title.size = 3)
+```
+:::
+:::{.column width="33%"}
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=2.5, var = 1, scale = 50) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2.5~~phi==50),
+            title.size = 3)
+```
+
+```{r, echo=F, fig.height=9}
+RMwhittle(nu=2.5, var = 1, scale = 100) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(kappa==2.5~~phi==100),
+            title.size = 3)
+```
+:::
+::::
+
+## Sférická třída
+
+::::{.columns}
+:::{.column width="50%"}
+\small
+
+$$
+\rho(u)= \left\{
+\begin{array}{ll}
+      1-\frac{3}{2}\left(\frac{u}{\phi}\right)+\frac{1}{2}\left(\frac{u}{\phi}\right)^3 & 0\leq u \leq \phi \\
+      0 & u > \phi\\
+\end{array} 
+\right. 
+$$
+
+$\phi$ ... range, $\phi>0$
+
+<br>
+
+<br>
+
+```{r, echo=F, fig.height=8}
+sph <- function(x, phi){ifelse(x>phi, 0,1-1.5*(x/phi)+0.5*(x/phi)^3)}
+x <- seq(0,1,l=200)
+data.frame(
+  x=rep(x,2),
+  y = c(
+    sph(x, 0.25),
+    sph(x, 0.75)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x))),
+          levels=c("m1","m2"))) %>%
+  ggplot(aes(x=x,y=y,lty=model)) + 
+  geom_line(size=2) +
+  scale_linetype_manual(values=1:2, 
+                        labels = c(bquote(phi==0.25),
+                                   bquote(phi==0.75))) +
+  labs(linetype="", x=bquote(u), y=bquote(rho(u))) +
+  theme_bw() +
+  theme(legend.position = c(.7,.7),
+        axis.title = element_text(size=30),
+        title = element_text(size=28),
+        axis.text = element_text(size=26),
+        legend.text = element_text(size=30),
+        legend.key.width = unit(2,"cm"))
+```
+:::
+:::{.column width="50%"}
+```{r, echo=F, fig.height=6}
+RMspheric(var = 1, scale = 10) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(phi==10),
+            title.size = 3)
+```
+```{r, echo=F, fig.height=6}
+RMspheric(var = 1, scale = 50) %>%
+  RFsimulate(x=1:100, y=1:100, grid = T) %>%
+  st_as_stars %>%
+  tm_shape() +
+  tm_raster(style="cont") +
+  tm_layout(legend.show = F,
+            title = expression(phi==50),
+            title.size = 3)
+```
+
+:::
+::::
+
+# Variogram
+
+## Variogram
+\small
+
+**(Semi)Variogram** ... alternativní popis autokorelační struktury procesu:
+
+$$V(x,x')=\frac{1}{2}Var\left(S(x)-S(x')\right)$$
+
+Ze vzorce pro rozptyl rozdílu dvou veličin dostáváme:
+
+$$V(x,x')=\frac{1}{2}\left[Var\left\{S(x)\right\}+Var\left\{S(x')\right\}-2Cov\left\{S(x),S(x')\right\}\right]$$
+Pro stacionární izotropní proces máme $Var\left\{S(x)\right\}=\sigma^2$, $Cov\left\{S(x),S(x')\right\}=\gamma(x,x')=\gamma(u)$, $\rho(u)=\gamma(u)/\sigma^2$ a platí:
+
+$$V(u)=\sigma^2\left\{1-\rho(u)\right\}$$
+Co to znamená? Variogram má *zrcadlově převrácený tvar* oproti korelační funkci.
+
+## Variogram
+\small
+
+::::{.columns}
+:::{.column}
+
+Matérn:
+
+```{r, echo=F, fig.height=3, fig.width=4.5}
+x <- seq(0, 1.5, l=200)
+data.frame(
+  x=rep(x,3),
+  y = c(
+    matt(x, 1.5, 0.1),
+    matt(x, 1.5, 0.2),
+    matt(x, 1.5, 0.3)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x)), rep("m3", length(x))),
+          levels=c("m1","m2","m3"))) %>%
+  ggplot(aes(x=x,y=y,lty=model)) + 
+  geom_line() +
+  scale_linetype_manual(values=1:3, 
+                        labels = c(bquote(kappa==1.5~~phi==0.1),
+                                   bquote(kappa==1.5~~phi==0.2),
+                                   bquote(kappa==1.5~~phi==0.3))) +
+  labs(linetype="", x=bquote(u), y=bquote(rho(u))) +
+  theme_bw() +
+  theme(legend.position = c(.7,.7),
+        axis.title.y = element_text(angle=0, vjust=0.5))
+```
+
+```{r, echo=F, fig.height=3, fig.width=4.5}
+x <- seq(0, 1.5, l=200)
+data.frame(
+  x=rep(x,3),
+  y = c(
+    1-matt(x, 1.5, 0.1),
+    1-matt(x, 1.5, 0.2),
+    1-matt(x, 1.5, 0.3)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x)), rep("m3", length(x))),
+          levels=c("m1","m2","m3"))) %>%
+  ggplot(aes(x=x,y=y,lty=model)) + 
+  geom_line() +
+  scale_linetype_manual(values=1:3, 
+                        labels = c(bquote(kappa==1.5~~phi==0.1),
+                                   bquote(kappa==1.5~~phi==0.2),
+                                   bquote(kappa==1.5~~phi==0.3))) +
+  scale_y_continuous(breaks = c(0,1), labels = c("0.00", expression(sigma^2))) +
+  labs(linetype="", x=bquote(u), y=bquote(V(u))) +
+  theme_bw() +
+  theme(legend.position = c(.7,.4),
+        axis.title.y = element_text(angle=0, vjust=0.5))
+```
+
+:::
+:::{.column}
+
+Spherical:
+
+```{r, echo=F, fig.height=3, fig.width=4.5}
+x <- seq(0,1,l=200)
+data.frame(
+  x=rep(x,2),
+  y = c(
+    sph(x, 0.25),
+    sph(x, 0.75)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x))),
+          levels=c("m1","m2"))) %>%
+  ggplot(aes(x=x,y=y,lty=model)) + 
+  geom_line() +
+  scale_linetype_manual(values=1:2, 
+                        labels = c(bquote(phi==0.25),
+                                   bquote(phi==0.75))) +
+  labs(linetype="", x=bquote(u), y=bquote(rho(u))) +
+  theme_bw() +
+  theme(legend.position = c(.7,.7),
+        axis.title.y = element_text(angle=0, vjust=0.5))
+```
+
+```{r, echo=F, fig.height=3, fig.width=4.5}
+x <- seq(0,1,l=200)
+data.frame(
+  x=rep(x,2),
+  y = c(
+    1-sph(x, 0.25),
+    1-sph(x, 0.75)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x))),
+          levels=c("m1","m2"))) %>%
+  ggplot(aes(x=x,y=y,lty=model)) + 
+  geom_line() +
+  scale_linetype_manual(values=1:2, 
+                        labels = c(bquote(phi==0.25),
+                                   bquote(phi==0.75))) +
+  scale_y_continuous(breaks = c(0,1), labels = c("0.00", expression(sigma^2))) +
+  labs(linetype="", x=bquote(u), y=bquote(V(u))) +
+  theme_bw() +
+  theme(legend.position = c(.7,.3),
+        axis.title.y = element_text(angle=0, vjust=0.5))
+```
+:::
+::::
+
+
+## Nugget effect
+\small
+
+Realistický předpoklad: data $(x_i,y_i)$ generována stacionárním "observačním" procesem
+
+$Y_i=S(x_i)+Z_i$, kde $Z_i\sim iid, E(Z_i)=0, Var(Z_i)=\tau^2$
+
+Variogram má pak podobu:
+
+$$V_Y=\tau^2+\sigma^2\left\{1-\rho(u)\right\}$$
+
+```{r, echo=F, fig.height=3, fig.width=7}
+x <- seq(0,1.5,l=200)
+vx <- 0.2 + 0.8*(1 - pex(x, 1, 0.265))
+data.frame(x=x,y=vx) %>%
+  ggplot(aes(x=x,y=y)) +
+  geom_line() +
+  annotate("segment", x=-0.05, xend=1.5, y=0.2, yend=0.2, lty=2) +
+  annotate("segment", x=-0.05, xend=1.5, y=1, yend=1, lty=2) +
+  annotate("segment", x=0.75, xend=0.75, y=0.95, yend=0.1, lty=3, arrow = arrow()) +
+  annotate("segment", x=-0.05, xend=0.75, y=0.95, yend=0.95, lty=3) +
+  annotate("text", x=1.2, y=0.25, label=bquote(nugget==tau^2)) +
+  annotate("text", x=1.2, y=1.05, label=bquote(sill==tau^2+sigma^2)) +
+  annotate("text", x=0.75, y=0.05, label="practical range") +
+  scale_x_continuous(breaks = c(0)) +
+  scale_y_continuous(breaks = c(0), limits = c(0,1.1)) +
+  labs(x="u", y="V(u)") +
+  theme_bw()
+```
+
+
+## Nugget effect
+\small
+
+První přístup:
+
+- rozhodnu se *modelovat nugget effect*
+- odhadnu $\tau^2$ z dat
+- dvojí interpretace: 
+  1. variabilita procesu měření (pozorování)
+  2. variabilita $S(x)$ v měřítku menším, než v jakém mám data
+- nelze odlišit, pokud nemám na jednom místě opakovaná měření
+- interpolace neprochází měřenými body
+
+Druhý přístup:
+
+- rozhodnu se *nastavit pevně* $\tau^2=0$
+- vlastně tvrdím, že pozoruju přímo $S(x)$ s nulovou chybou
+- interpolace přesně prochází měřenými body
+
+## Proč variogram?
+\small
+
+- existují procesy, které nemají stacionární $\gamma(x,x')$, ale mají $V(u)$ (tzv. vnitřně stacionární procesy)
+- dá se dobře odhadnout z dat:
+  1. vynesu $v_{ij}=\frac{1}{2}\left(Y_i-Y_j\right)^2$ proti $u$ do grafu (tzv. **variogram cloud**)
+  2. zhladím zprůměrováním (tzv. **empirický variogram**)
+
+::::{.columns}
+:::{.column}
+
+```{r, echo=F, fig.height=3.5, fig.width=3.5}
+library(gstat, ec)
+prec.sf <- st_read("data/precipitation_2014.shp", quiet=T) %>%
+  st_transform(5514) %>%
+  filter(!is.na(Jul))
+vario <- variogram(Jul~1, prec.sf, cloud=T)
+plot(vario, alpha=.3, col="black")
+```
+:::
+:::{.column}
+```{r, echo=F, fig.height=3.5, fig.width=3.5}
+vario <- variogram(Jul~1, prec.sf, cloud=F)
+plot(vario, col="black")
+```
+:::
+::::
+

@@ -1,0 +1,57 @@
+---
+title: 'Prostorová data v R: Rastry'
+author: "Vojtěch Barták"
+date: "LS 2022"
+output:
+  beamer_presentation:  
+    incremental: false  
+    theme: "Frankfurt"  
+    colortheme: "beaver"  
+    toc: true   
+    slide_level: 3
+    keep_tex: true
+header-includes: 
+  - \AtBeginSubsection{} 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, cache=T)
+```
+
+# Rastrová data v R
+
+## RSpatial
+
+RSpatial ecosystém...
+
+## `raster`
+
+O balíčku raster...
+
+## `terra`
+
+O balíčku terra...
+
+## `stars`
+
+O balíčku stars...
+
+# Vizualizace prostorových dat v R
+
+## `tmap`
+
+tmap...
+
+## `leaflet`
+
+leaflet...
+
+## Další balíčky
+
+Další balíčky...
+
+# Další věci
+
+## Propojení s GIS
+
+Propojení s GIS...

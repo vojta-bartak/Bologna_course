@@ -1,0 +1,463 @@
+---
+title: 'Prostorová data v R: Vektory'
+author: "Vojtěch Barták"
+date: "LS 2022"
+output:
+  beamer_presentation:  
+    incremental: false  
+    theme: "Frankfurt"  
+    colortheme: "beaver"  
+    toc: true   
+    slide_level: 3
+    keep_tex: true
+header-includes: 
+  - \AtBeginSubsection{} 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, cache=T)
+```
+
+
+# Obsah kurzu
+
+## Analýza prostorových dat
+
+Geoprocessing:
+
+\small
+- manipulace s daty (vektory, rastry, konverze, ...)
+- atributové dotazy, prostorové dotazy, sumarizace, ...
+- překryvné analýzy, vzdálenostní analýzy, mapová algebra, analýza terénu, ...
+
+\normalsize
+Prostorová statistika (*Cressie*, 1993)
+
+\small
+- geostatistika
+- bodové struktury
+- plošná data
+
+## Prostorová statistika
+
+Geostatistika:
+
+\small
+- modelovaná veličina se spojitě mění v prostoru
+- data představují její bodová měření
+- interpolace, ale ne jen...
+
+```{r, echo=F, fig.height=1.8, fig.width=1.8, fig.align="center"}
+library(RandomFields)
+library(stars)
+library(tmap)
+x <- y <- 1:100
+pred <- RFsimulate(RMmatern(nu=0.5, var=1, scale=50), x, y, grid = T)
+rpred <- st_as_stars(pred)
+obs <- st_as_sf(expand.grid(x=seq(2,98,10),y=seq(2,98,10)), coords = c("x", "y"))
+tm_shape(rpred) +
+  tm_raster(style="cont") +
+  tm_shape(obs) +
+  tm_dots() +
+  tm_layout(legend.show=F)
+```
+
+
+## Prostorová statistika
+
+Bodové struktury (*Spatial Point Patterns*):
+
+\small
+- data představují místa vzniku nějakých událostí (stromy v lese, rozmístění buněk ve tkáni, místa dopravních nehod, ...)
+
+```{r, echo=F, fig.height=1.7, fig.width=1.7, fig.align="center"}
+library(RandomFields)
+library(stars)
+library(tmap)
+x <- y <- 1:100
+pred <- RFsimulate(RMmatern(nu=0.5, var=1, scale=50), x, y, grid = T)
+rpred <- st_as_stars(pred)
+obs <- st_as_sf(data.frame(x=runif(100,1,100),y=runif(100,1,100)), coords = c("x", "y"))
+tm_shape(rpred) +
+  tm_raster() +
+  tm_shape(obs) +
+  tm_dots() +
+  tm_layout(legend.show=F)
+```
+
+- na čem závisí, zda v daném místě dojde či nedojde k události?
+- jsou mezi událostmi nějaké vztahy? (Přitahují/odpuzují se?)
+
+## Prostorová statistika
+
+Plošná data (*Areal data*, *Lattice Models*):
+
+\small
+- data jsou v prostoru vázána na pevně daná diskrétní místa
+- typicky sumární hodnoty v rámci plošných jednotek
+- mezi sousedícími jednotkami jsou prostorové vazby (*prostorová autokorelace*)
+
+```{r, echo=F, fig.height=2.2}
+library(sf)
+library(tmap)
+okresy <- st_read("data/ArcCR500/AdministrativniCleneni_v13.gdb", "OkresyPolygony", quiet = T)
+tm_shape(okresy, bbox = st_bbox(okresy[okresy$NAZ_CZNUTS3 %in% c("Karlovarský kraj", "Liberecký kraj"),])) +
+  tm_fill("MIRA_NEZAM", palette = "Blues") +
+  tm_borders() +
+  tm_layout(legend.show = F)
+```
+
+- např. epidemiologie: jaké je riziko nákazy v daném okrese, známe-li riziko v sousedních okresech?
+
+## Program
+
+\small
+```{r, echo=FALSE}
+library(dplyr)
+library(knitr)
+data.frame(
+  Týden = 1:12,
+  Program = c("Prostorová data v R: Vektory", "Prostorová data v R: Rastry", "Prostorová data v R",
+              "Geostatistika", "Geostatistika", "**Test**", "Bodové struktury", "Bodové struktury",
+              "Bodové struktury", "Plošná data", "Plošná data", "**Test**")
+) %>% kable
+```
+
+
+# R a RStudio
+
+## R
+
+Statistická analýza:
+
+\small
+- `mean`, `sd`, `lm`, `glm`, ...
+- **mraky** balíčků na prakticky **jakoukoli** analýzu (včetně prostorových)
+
+\normalsize
+Manipulace s daty:
+
+\small
+- vektory, faktory, `data.frame`, ...
+- `for`, `if`, `ifelse`, `aggregate`, `lapply`, `sapply`, ...
+- `tidyverse` ([Hadley Wickham](https://hadley.nz/), [www.tidyverse.org](https://www.tidyverse.org/))
+  - `dplyr`, `tidyr`, `tibble`, `purrr`, `ggplot2`, ...
+
+\normalsize
+Vizualizace dat:
+
+\small
+- `plot`, `hist`, `boxplot`, `barplot`, `pieplot`, `polygon`, ...
+- `lattice`, `ggplot2`
+
+## Tidyverse
+
+::: columns
+
+:::: column
+Postaru:
+
+\tiny
+
+```{r, eval=F}
+tab <- read.table(...)
+tab <- tab[tab$col1 < 1000,]
+tab <- tab[,c("col1", "col2")]
+tab$col3 <- tab$col1 + 5
+tab <- aggregate(col3 ~ col2,
+                 FUN = mean,
+                 data = tab)
+```
+
+\normalsize
+
+::::
+
+:::: column
+`dplyr`:
+
+\tiny
+
+```{r, eval=F}
+tab <- read.table(...)
+tab <- filter(tab, col1 < 1000)
+tab <- select(tab, col1, col2)
+tab <- mutate(tab, col3 = col1 + 5)
+tab <- group_by(tab, col2)
+tab <- summarize(tab, col3 = mean(col1))
+```
+
+\normalsize
+
+::::
+
+:::
+
+## Tidyverse
+
+::: columns
+
+:::: column
+Postaru:
+
+\tiny
+
+```{r, eval=F}
+tab <- summarize(
+  group_by(
+    mutate(
+      select(
+        filter(
+          read.table(...), 
+          col1 < 1000), 
+        col1, col2), 
+      col3 = col1 + 5), 
+    col2), 
+  col3.mean = mean(col1))
+```
+
+\normalsize
+
+::::
+
+:::: column
+*Pipeline* syntaxe:
+
+\tiny
+
+```{r, eval=F}
+tab <- read.table(...) %>%
+  filter(col1 < 1000) %>%
+  select(col1, col2) %>%
+  mutate(col3 = col1 + 5) %>%
+  group_by(col2) %>%
+  summarize(col3.mean = mean(col1))
+```
+
+\normalsize
+
+::::
+
+:::
+
+## Tidyverse
+
+::: columns
+
+:::: column
+Postaru:
+
+\tiny
+
+```{r, echo=F}
+df <- data.frame(
+  time = 1:20,
+  bitcoin = 10 + 2.3*(1:20) + rnorm(20, 0, 5)
+)
+```
+
+
+```{r, fig.width=4, fig.height=4}
+plot(bitcoin~time, data=df)
+lines(bitcoin~time, data=df)
+```
+
+::::
+
+:::: column
+\normalsize
+`ggplot2`:
+
+\tiny
+
+```{r, fig.width=4, fig.height=3}
+library(ggplot2)
+ggplot(df, aes(x=time, y=bitcoin)) +
+  geom_point() +
+  geom_line()
+```
+
+::::
+
+:::
+
+
+
+## RStudio
+
+\small
+- integrované vývojové prostředí
+- umožňuje kombinovat R s jinými jazyky (C++, Python, ...)
+
+\normalsize
+RMarkdown:
+
+\small
+- reporty kombinující kód, grafické a numerické výstupy a komentáře
+- export do pdf nebo html
+- prezentace
+
+\normalsize
+RBookdown:
+
+\small
+- knihy založené na RMarkdown
+
+\normalsize
+Shiny Web App:
+
+\small
+- webové aplikace propojené s kódem a daty
+
+# Vektorová data v R
+
+## Open GIS obecně
+
+\small
+- QGIS, GRASS, SAGA
+- Python, R, JavaScript
+- Open Geospatial Consortium: <https://www.ogc.org/>
+- The Open Source Geospatial Foundation: <https://www.osgeo.org/>
+- <https://www.gismentors.cz>
+
+## R-Spatial
+
+::::{.columns}
+
+:::{.column width="60%"}
+**Roger Bivand** (Norwegian School of Economics):
+
+\small
+- <https://cran.r-project.org/web/views/Spatial.html>
+
+- https://www.r-pkg.org/maint/Roger.Bivand@nhh.no
+
+\normalsize
+**Edzer Pebesma** (Institut für Geoinformatik, Universität Münster):
+
+\small
+- <https://r-spatial.org/projects/>
+
+- https://www.r-pkg.org/maint/edzer.pebesma@uni-muenster.de
+:::
+
+:::{.column width="40%"}
+```{r, echo=F, out.height="30%", fig.align="right"}
+library(knitr)
+include_graphics("data/bivand.jpg")
+include_graphics("data/pebesma.jpg")
+```
+:::
+
+::::
+
+## `sp`
+::::{.columns}
+:::{.column width="60%"}
+Třídy pro prostorová data:
+
+\small
+- `SpatialPoints`, `SpatialPointsDataFrame`
+- `SpatialLines`, `SpatiaLinesDataFrame`
+- `SpatialPolygons`, `SpatialPolygonsDataFrame`
+- `SpatialGrid`, `SpatialPixels`
+
+\normalsize
+Doplňující balíčky:
+
+\small
+- `rgdal`: čtení/zápis geodat (GDAL)
+- `rgeos`: geometrické operace (GEOS)
+:::
+
+:::{.column width="40%"}
+```{r, echo=F, out.height="60%"}
+include_graphics("data/asdar.jpg")
+```
+:::
+::::
+
+## Simple Features
+
+= OGC standard pro vektorová data
+
+```{r, echo=F, out.height="70%", fig.align="center"}
+include_graphics("data/sf1.png")
+```
+
+## Simple Features
+
+Struktura tříd (nejsou zde všechny!):
+
+![](data/sf2.png)
+
+## `sf`
+
+\small
+
+- Integrace knihoven GEOS, GDAL, PROJ do jednoho balíčku
+
+- <https://r-spatial.github.io/sf/index.html>
+
+- Objekt **`sf`**: dataframe rozšířený o sloupec s geometriemi
+
+
+```{r, eval=F}
+kraje <- st_read("data/kraje.shp")
+head(kraje)
+```
+
+\tiny
+
+```{r, echo=F}
+library(dplyr)
+kraje <- st_read("data/kraje.shp", quiet = T) %>% select(-AREA, -PERIMETER, -NK, -KN, -NAZEV_ENG, -OB_311202, -NUTS3,-NUTS2)
+head(kraje)
+```
+
+
+## `sf`
+
+Základní třídy: `sfg`, `sfc`, `sf`, `crs`
+
+![](data/sfstructure.png)
+
+## `sf`
+
+Vztah `sf` k dalším balíčkům a knihovnám:
+
+![](data/sfpkg.png)
+
+
+## `sf`
+
+Přehled funkcí `sf` (nemusí být aktuální):
+
+![](data/sffunctions.png)
+
+## `sf`
+
+Přehled metod `sf` (nemusí být aktuální):
+
+![](data/sfmethods.png)
+
+
+## Další užitečné odkazy
+
+\small
+
+**Geocomputation with R** - https://geocompr.robinlovelace.net/
+
+https://cran.r-project.org/doc/contrib/intro-spatial-rl.pdf
+
+https://www.littlemissdata.com/blog/maps
+
+https://www.paulamoraga.com/book-geospatial/sec-spatialdataandCRS.html
+
+https://cengel.github.io/R-spatial/
+
+http://132.72.155.230:3838/r/index.html
+
+https://mgimond.github.io/Spatial/index.html
+
+https://kodu.ut.ee/~kmoch/geopython2019/index.html#

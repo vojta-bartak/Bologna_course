@@ -1,0 +1,102 @@
+---
+title: 'Kriging'
+author: "Vojtěch Barták"
+date: "LS 2022"
+output:
+  beamer_presentation:  
+    incremental: false  
+    theme: "Frankfurt"  
+    colortheme: "beaver"  
+    toc: true   
+    slide_level: 3
+    keep_tex: true
+header-includes: 
+  - \AtBeginSubsection{} 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, cache=T)
+```
+
+# Kriging: tradiční přístup
+
+## Kriging: tradiční přístup
+\small
+
+\begin{alertblock}{Základní pojmy}
+$S(x)$ ... náhodný proces v místě $x$ (náhodná veličina)
+\newline \newline
+$Y(x)$ ... pozorování (měření) v místě $x$ (náhodná veličina)
+\newline \newline
+$y_1, y_2, ..., y_n$ ... konkrétní naměřené hodnoty v místech $x_1, x_2, ..., x_n$ (data)
+\newline \newline
+$\hat{S}(x)$ ... hledaný odhad (střední hodnoty) procesu v místě $x$
+\end{alertblock}
+
+- Odhad $\hat{S}(x)$ je funkcí dat:
+
+$$\hat{S}(x)=f(\{y_1, y_2, ..., y_n\})$$
+
+## Kriging: tradiční přístup
+\small
+
+\begin{alertblock}{Základní princip}
+Hledám takový odhad $\hat{S}(x)$, který bude \emph{lineární funkcí} dat, tj. 
+
+$$\hat{S}(x)=\sum_{i=1}^na_iy_i$$ 
+\end{alertblock}
+
+- Jde tedy o "vážený průměr" dat, $a_i$ jsou tzv. *kriging weights*
+- Aby byl odhad tzv. *nestranný*, požaduji dále: 
+
+\begin{center}
+$\sum_{i=1}^na_i=1$
+\end{center}
+
+- Hledám takové váhy $a_i$, aby tzv. **střední kvadratická chyba** odhadu byla co možná nejmenší:
+
+\begin{center}
+$MSE(\hat{S}(x))=E\left[\hat{S}(x)-S(x)\right]^2\rightarrow min$
+\end{center}
+
+## Kriging: tradiční přístup
+\small
+
+\begin{alertblock}{Simple kriging}
+Předpokládáme, že $\mu = konst.$ a \textbf{známe je}. Pak:
+
+$$$$
+
+\end{alertblock}
+
+## Kriging: tradiční přístup
+\small
+
+**Ordinary kriging**:
+
+## Kriging: tradiční přístup
+\small
+
+**Universal kriging**:
+
+## Kriging: tradiční přístup
+\small
+
+**Problémy:**
+
+# Kriging: moderní přístup
+
+## Kriging: moderní přístup
+\small
+
+**Lineární model**:
+
+## Kriging: moderní přístup
+\small
+
+**Geostatistický model**:
+
+## Kriging: moderní přístup
+\small
+
+# Varianty krigingu? Nebo něco jinýho? ...

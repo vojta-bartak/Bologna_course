@@ -1,0 +1,253 @@
+---
+title: "Spatial randomization as an approach to deal with spatially autocorrelated ecological data"
+author: "Vojta Barták"
+institution: "DSS FES CZU Prague"
+email: "bartakv@fzp.czu.cz"
+date: "04 2023"
+output:
+  beamer_presentation:  
+    incremental: false  
+    theme: "Frankfurt"  
+    colortheme: "beaver"  
+    toc: true   
+    slide_level: 3
+    keep_tex: true
+header-includes: 
+  - \AtBeginSubsection{}
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, warning=F, message=F, cache=T)
+```
+
+# Spatial autocorrelation in ecology
+
+## Spatial autocorrelation in ecology
+
+![](Conference_London/species.png)
+
+## Spatial autocorrelation in ecology
+
+![](Conference_London/species.png)
+
+\small
+
+Correlation
+
+- 
+
+## Spatial autocorrelation
+
+![](Conference_London/sac_scales_new.png)
+
+![](SAC_function.png){height="50%"}
+
+
+## SAC in Ecology
+
+![](dormann_paper.png)
+
+\small
+
+-   Autocovariate models
+-   Generalized Least Squares (GLS) - geostatistics
+-   Autoregressive models (CAR, SAR)
+-   Adding coordinates as predictors (e.g. in GAM)
+-   Spatial Eigenvector Mapping (SEVM)
+
+## Do these methods work?
+
+![](spatial_models_effectiveness.png){}
+
+# Problem
+
+## Problem
+
+\small
+
+**Spatial** or **structural** relationship?
+
+![](Conference_London/species.png)
+
+Possible explanations:
+
+1.  A direct causal effect
+2.  An indirect causal effect
+3.  An accidental spatial association
+
+## Chapman 2010
+
+\small
+
+![](chap_header.png)
+
+![](picto_plants.jpg){width="40%"}
+
+Data:
+
+-   100 UK plant species at 10x10 km grid
+-   23 climatic variables
+-   simulated variables with same properties
+
+Models:
+
+-   GLM, random forests
+-   non-spatial models, trend surfaces, autoregression
+-   Single predictors, PCA
+
+## Chapman 2010
+
+\small
+
+![](chap_sims.png){height="90%"}
+
+## Chapman 2010
+
+\small
+
+![](chap_single.png){height="90%"}
+
+## Fourcade, Besnard, Secondi 2018
+
+\small
+
+![](paint_header.png){width="80%"}
+
+-   497 species from European Red List (GBIF)
+-   real environmental predictors vs paintings
+
+![](paint_paint.png)
+
+## Fourcade, Besnard, Secondi 2018
+
+\small
+
+![](paint_scheme.png){height="90%"}
+
+## Lessons learned:
+
+-   The problem is there and it's serious!
+-   Spatial models cannot successfully beat it.
+-   It's not a problem for interpolation...
+-   ...but it is a (big) problem for model projections in space and time.
+-   The problem is resolved for testing correlation, but not for multiple regression.
+
+# Solution
+
+## Existing solutions (correlation only!)
+
+Parametric solutions:
+
+-   Modified sample size (Clifford and Richardson 1985)
+-   Maximum likelihood test (Vallejos, Osorio, Bevilacqua 2020)
+
+Non-parametric solutions:
+
+-   **Basic idea**: keeping one variable fixed, randomizing the other while *keeping its SAC*
+-   Random shift (Mrkvička et al. 2021)
+-   Random shuffle and variogram matching (Viladomat et al. 2014)
+
+## My solution
+
+Could the observed relationship be a result of a pure overlay of two independent but autocorrelated variables?
+
+![](Conference_London/species.png)
+
+\small
+
+-   Keeping one variable (e.g., the response) fixed...
+-   ...while randomizing the other(s), e.g., the predictor(s)
+
+## Possible randomizations
+
+\small
+
+a)  Simulation of new (null) predictors
+
+-   you have to know/estimate the SAC function
+
+b)  Random shift of the predictor(s)
+
+-   you need the predictor as a raster
+-   random shif / random rotation / random shift & rotation
+
+![](Conference_London/randomizations.png){width="80%"}
+
+c) Random shift and kriging
+
+## Outputs
+
+![](example_sac5_complet.png)
+
+## Outputs
+
+![](example_sac50_complet.png)
+
+## Outputs
+
+![](Conference_London/examples_dark.png)
+
+
+## Type I error rate
+
+\small
+
+-   Predictor and response simulated **independent**
+-   Each combination of SAC scales $\rightarrow$ 1000 repetitions $\rightarrow$ rejection rate
+
+![](Conference_London/rejection_rates2.png)
+
+## Statistical power
+
+\small
+
+-   Response simulated as **dependent** on the predictor: $$response = predictor + \alpha \cdot error$$
+-   $predictor$ and $response$ are random fields with given SAC scales
+-   $\alpha$ controls the signal-to-noise ratio:
+
+![](Conference_London/alpha_values.png){width="60%"}
+
+## Statistical power
+
+![](Conference_London/rejection_rates_reg.png)
+
+# Real data example
+
+## Data
+
+\small
+
+::: columns
+::: column
+Species data:
+
+-   sPlotOpen vegetation plot database
+-   **species richness** for Europe (\~ 35,000 records)
+
+![](sPlotOpen_data.png){height="60%"}
+:::
+
+::: column
+Environmental data:
+
+-   December mean **wind speed** from Worldclim
+
+![](wind_speed_data.png)
+:::
+:::
+
+## Europe-wise results
+
+![](splot_europe_effect.png)
+
+## Individual countries
+
+![](country_plot.png)
+
+## Selected countries
+
+![](country_plot_selected.png)
+
+## Random shift and rotation:
+
+![](null_plots_selected.png)

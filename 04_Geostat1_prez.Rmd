@@ -1,0 +1,100 @@
+---
+title: 'Kriging'
+author: "Vojtěch Barták"
+date: "LS 2022"
+output:
+  beamer_presentation:  
+    incremental: false  
+    theme: "Frankfurt"  
+    colortheme: "beaver"  
+    toc: true   
+    slide_level: 3
+    keep_tex: true
+header-includes: 
+  - \AtBeginSubsection{} 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, cache=T)
+```
+
+# Klasická geostatistika
+
+## Základní pojmy
+\small
+
+\begin{alertblock}{Model}
+
+Pro libovolné místo $\mathbf{s} \in D$ omezené části roviny $D \subset{\mathbb{R}^2}$:
+
+$$Y(\mathbf{s})=\mu(\mathbf{s})+e(\mathbf{s})$$
+
+$\mu(\mathbf{s})=E\left[Y(\mathbf{s})\right]$ je deterministická, spojitá funkce (\emph{střední hodnota})
+
+$e(\mathbf{s})$ je náhodný "chybový" proces 
+
+\end{alertblock}
+
+$e(\mathbf{s})$ má:
+
+- nulovou střední hodnotu: $E\left[e(\mathbf{s})\right]=0$
+- stacionární a izotropní \emph{kovarianční funkci}: $Cov(\mathbf{s},\mathbf{s^\prime})=C(|\mathbf{s}-\mathbf{s}^\prime|)=C(u)$
+- \emph{Variogram}: $\gamma(u)=C(0)-C(u)$
+
+Většinou uvažujeme ještě $e(\mathbf{s})=\eta(\mathbf{s})+\epsilon(\mathbf{s})$, kde
+
+- $\eta(\mathbf{s})$ je prostorově autokorelovaný proces
+- $\epsilon(\mathbf{s})$ je prostorově nezávislý proces (např. chyba měření)
+
+## Základní kroky
+\small
+
+1. Předběžně odhadneme $\mu(\mathbf{s})$ (OLS)
+    -  buď jako konstantu, prostorový *trend*, nebo jako lineární funkci nějakých *kovariát*
+2. Z reziduálů odhadneme $\gamma(u)$ pomocí *empirického variogramu*
+3. Empirickým variogramem proložíme *parametrický model* $\hat{\gamma}(u)$
+    - např. Matérn, exponenciální model apod.
+4. Zpětně znovu odhadneme $\mu(\mathbf{s})$ se zahrnutím autokorelační struktury (GLS)
+    - pokud nám jde primárně o $e(\mathbf{s})$ (tj. interpolaci), lze tento krok vynechat
+    - lze ovšem naopak po tomto kroku znovu odhadnout variogram z nových reziduálů
+    - takto lze případně iterovat (většinou není třeba)
+5. Na základě znalosti $\mu(\mathbf{s})$ a $e(\mathbf{s})$ provedeme prostorovou predikci (*kriging*)
+
+## Předběžný odhad $\mu(x)$
+\small
+
+\begin{alertblock}{Ordinary Least Squares regression}
+Uvažujeme lineární model
+
+$$\mu(\mathbf{s},\mathbf{\beta})=\mathbf{X}(\mathbf{s})^T\mathbf{\beta}$$
+kde $\mathbf{X}(\mathbf{s})$ je vektor kovariát a $\mathbf{\beta}$ je vektor regresních koeficientů. Odhad, který minimalizuje $\sum_{i=1}^n\left[Y(\mathbf{s}_i)-\mathbf{X}(\mathbf{s}_i)^T\mathbf{\beta}\right]^2$, je
+
+$$\hat{\mathbf{\beta}}_{OLS}=(\mathbf{X}^T\mathbf{X})^{-1}\mathbf{X}^T\mathbf{Y}$$
+
+kde $\mathbf{X}=[\mathbf{X}(\mathbf{s}_1),\mathbf{X}(\mathbf{s}_2),...,\mathbf{X}(\mathbf{s}_n)]^T$ a $\mathbf{Y}=[Y(\mathbf{s}_1),Y(\mathbf{s}_2),...,Y(\mathbf{s}_n)]^T$.
+
+\end{alertblock}
+
+- zahrnuje i odhad konstatní střední hodnoty - výběrový průměr
+- slouží jen pro prvotní odhad (porušené předpoklady!)
+- pro další kroky potřebujeme *reziduály*: $\hat{e}(\mathbf{s}_i)=Y(\mathbf{s}_i)-\mathbf{X}(\mathbf{s})^T\hat{\mathbf{\beta}}_{OLS}$
+
+## Empirický (semi)variogram
+\small
+
+Variogram cloud - zhlazení
+
+Různé metody, nejčastěji metoda *vážených nejměnších čtverců* (WLS)
+
+## Modelování variogramu
+\small
+
+Známé modely (viz minulá přednáška...)
+
+## Revidovaný odhad $\mu(x)$
+\small
+
+Metoda *Generalized least squares* (GLS):
+
+## Kriging
+\small

@@ -1,0 +1,388 @@
+---
+title: 'Prostorová autokorelace a gaussovské procesy'
+author: "Vojtěch Barták"
+date: "LS 2022"
+output:
+  beamer_presentation:  
+    incremental: false  
+    theme: "Frankfurt"  
+    colortheme: "beaver"  
+    toc: true   
+    slide_level: 3
+    keep_tex: true
+header-includes: 
+  - \AtBeginSubsection{} 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, cache=T)
+```
+
+# Prostorová autokorelace
+
+## Korelace dvou veličin
+\small
+
+```{r, echo=FALSE, fig.height=1.5, fig.width=2.5}
+library(mvtnorm)
+library(ggplot2)
+m <- c(3.4,5.6)
+s <- matrix(c(1,0.8,0.8,1), ncol = 2)
+xy <- as.data.frame(rmvnorm(100, mean=m, sigma=s))
+ggplot(xy, aes(x=V1, y=V2)) +
+  geom_point(size=0.5) +
+  geom_smooth(method="lm", se=F, color="red", size=0.5) +
+  annotate("segment", x=c(mean(xy$V1), min(xy$V1)), xend=c(mean(xy$V1), max(xy$V1)), y=c(min(xy$V2), mean(xy$V2)), yend=c(max(xy$V2), mean(xy$V2)), 
+           lty=2, color="grey50") +
+  theme_bw() +
+  theme(axis.title.x = element_text(hjust = 1),
+        axis.title.y = element_text(hjust = 1, angle=0)) +
+  labs(x="X", y="Y") +
+  scale_x_continuous(breaks=c(mean(xy$V1)), labels = c(expression(bar(X)))) +
+  scale_y_continuous(breaks=c(mean(xy$V2)), labels = c(expression(bar(Y))))
+```
+
+Výběrová kovariance: $S_{XY}=\frac{1}{n-1}\sum_i(X_i-\bar{X})(Y_i-\bar{Y})$
+
+Korelační koeficient: $r=\frac{S_{XY}}{S_X S_Y}$, $-1 \le r \le 1$
+
+## Korelace dvou veličin
+\small
+
+**Matematický model**: $(X,Y) \sim N(\overrightarrow\mu, \overrightarrow\Sigma)$
+
+```{r, echo=FALSE, fig.height=1.5, fig.width=2.5}
+data.grid <- expand.grid(V1 = seq(min(xy$V1), max(xy$V1), l=200), V2 = seq(min(xy$V2), max(xy$V2), l=200))
+contours <- cbind(data.grid, prob = dmvnorm(data.grid, mean = m, sigma = s))
+ggplot(xy, aes(x=V1, y=V2)) +
+  geom_point(size=0.5) +
+  geom_contour(data=contours, aes(z=prob), alpha=.5, breaks = seq(min(contours$prob), max(contours$prob), l=10)) +
+  annotate("segment", x=c(mean(xy$V1), min(xy$V1)), xend=c(mean(xy$V1), max(xy$V1)), y=c(min(xy$V2), mean(xy$V2)), yend=c(max(xy$V2), mean(xy$V2)), 
+           lty=2, color="grey50") +
+  theme_bw() +
+  theme(axis.title.x = element_text(hjust = 1),
+        axis.title.y = element_text(hjust = 1, angle=0)) +
+  labs(x="X", y="Y") +
+  scale_x_continuous(breaks=c(mean(xy$V1)), labels = c(expression(bar(X)))) +
+  scale_y_continuous(breaks=c(mean(xy$V2)), labels = c(expression(bar(Y))))
+```
+
+Varianční matice: $\overrightarrow\Sigma=\begin{pmatrix}var(X) & cov(X,Y)\\cov(X,Y) & var(Y)\end{pmatrix}$
+
+Kovariance: $cov(X,Y)=E[(X-E(X))(Y-E(Y))]$
+
+Korelační koeficient: $\rho = \frac{cov(X,Y)}{\sigma(X)\sigma(Y)}$
+
+## Časová autokorelace
+\small
+
+Časová řada:
+
+```{r, echo=F, fig.height=1, fig.width=3}
+library(dplyr)
+library(purrr)
+t <- read.table("data/P1PKLE01_T_N.csv", header=T, sep=";", dec=",") %>%
+  set_names(c("year","month","day","temperature","a","b","c")) %>%
+  filter(year==1989 & month %in% c(7,8)) %>%
+  mutate(time = as.POSIXct(paste(day,month,year,sep=":"), format="%d:%m:%Y"))
+ggplot(t, aes(x=time, y=temperature)) +
+  geom_line(size=.3) +
+  theme_bw() +
+  labs(x="", y="T (°C)") +
+  theme(axis.title.y = element_text(angle=0, size=8),
+        axis.text = element_text(size=6))
+```
+
+:::{.columns}
+::::{.column}
+
+```{r, echo=F, fig.height=1.7, fig.width=1.7}
+acor <- function(x, lag=1){
+  s2 <- var(na.omit(x))
+  m <- mean(na.omit(x))
+  sum((x[1:(length(x)-lag)]-m)*(x[(lag+1):length(x)]-m), na.rm = T)/((length(x)-lag)*s2)
+}
+df.t <- data.frame(t1 = t$temperature[1:(nrow(t)-1)], t2 = t$temperature[2:nrow(t)])
+ggplot(df.t, aes(x=t1, y=t2)) +
+  geom_point(size=.5) +
+  theme_bw() +
+  theme(axis.title = element_text(size=8),
+        title = element_text(size=7),
+        axis.text = element_text(size=6)) +
+  labs(x=bquote(paste("Teplota v čase ",italic(t))),
+       y=expression(Teplota~v~čase~italic(t)+1),
+       title = bquote(italic(r)==.(round(acor(t$temperature, 1),2))))
+```
+
+::::
+::::{.column}
+
+```{r, echo=F, fig.height=1.7, fig.width=1.7}
+lag <- 3
+ggplot(data.frame(t1 = t$temperature[1:(nrow(t)-lag)], t2 = t$temperature[(lag+1):nrow(t)]), 
+       aes(x=t1, y=t2)) +
+  geom_point(size=.5) +
+  theme_bw() +
+  theme(axis.title = element_text(size=8),
+        title = element_text(size=7),
+        axis.text = element_text(size=6)) +
+  labs(x=bquote(paste("Teplota v čase ",italic(t))),
+       y=bquote(Teplota~v~čase~italic(t)+.(lag)),
+       title = bquote(italic(r)==.(round(acor(t$temperature, lag),2))))
+```
+
+::::
+:::
+
+## Časová autokorelace
+\small
+
+Časová řada:
+
+```{r, echo=F, fig.height=1, fig.width=3}
+ggplot(t, aes(x=time, y=temperature)) +
+  geom_line(size=.3) +
+  theme_bw() +
+  labs(x="", y="T (°C)") +
+  theme(axis.title.y = element_text(angle=0, size=8),
+        axis.text = element_text(size=6))
+```
+
+Korelace jako funkce časového intervalu:
+
+```{r, echo=F, fig.height=1, fig.width=3}
+tac <- sapply(0:15, function(lag) acor(t$temperature, lag))
+ggplot(data.frame(r=tac, lag=0:15), aes(x=lag, y=r)) +
+  geom_line(size=.3) +
+  geom_point(size=.3) +
+  theme_bw() +
+  labs(x="Časový interval", y=expression(italic(r))) +
+  theme(axis.title = element_text(angle=0, size=8),
+        axis.text = element_text(size=6))
+```
+
+- Předpoklad: časová řada je (tzv. slabě) **stacionární**!
+
+## Prostorová autokorelace
+\small
+
+Měření v prostoru:
+
+```{r, echo=F, out.height="30%"}
+library(stars)
+library(sf)
+library(raster)
+ras <- read_stars("data/dtm_CR.tif") %>%
+  st_set_crs(5514) %>%
+  st_crop(st_read("data/ArcCR500/AdministrativniCleneni_v13.gdb","ObcePolygony", quiet=T) %>% 
+            "["(400,))
+#  as("Raster") %>%
+#  persp(theta=120, phi=400, box=F, expand=0.3)
+knitr::include_graphics("terrain2.png")
+```
+
+::::{.columns}
+:::{.column}
+
+```{r, echo=F, fig.height=1.7, fig.width=1.7}
+#xy <- expand.grid(x = seq(st_bbox(ras)[1]+100,st_bbox(ras)[3]-100, l=20),
+#                  y = seq(st_bbox(ras)[2]+100,st_bbox(ras)[4]-100, l=20))
+#xy$z <- st_extract(ras, as.matrix(xy))[,1]
+#xy <- filter(xy, !is.na(z))
+#p <- persp(z=ras[[1]], theta=100, phi=400, box=F, expand=0.3)
+#p <- persp(as(ras, "Raster"), theta=100, phi=400, box=F, expand=0.3)
+#mypoints <- trans3d(xy$x,xy$y,xy$z,pmat = p)
+#points(mypoints,pch = 16,col = 2)
+xy <- expand.grid(x = seq(st_bbox(ras)[1]+500,st_bbox(ras)[3]-500, l=10),
+                  y = seq(st_bbox(ras)[2]+500,st_bbox(ras)[4]-500, l=10))
+xy$z <- st_extract(ras, as.matrix(xy))[,1]
+xy <- filter(xy, !is.na(z))
+acf2 <- function(lag){
+  shift <- matrix(c(rep(50, nrow(xy)), rep(0, nrow(xy))), ncol = 2)
+  shift.x <- sample(c(0,lag),size = nrow(xy), replace = T)
+  shift.y <- lag-shift.x
+  shift <- matrix(c(shift.x,shift.y), ncol = 2)
+  xy$z2 <- st_extract(ras, as.matrix(xy[,1:2])+shift)[,1]
+  s2 <- var(na.omit(c(xy$z, xy$z2)))
+  m <- mean(na.omit(c(xy$z, xy$z2)))
+  sum((xy$z-m)*(xy$z2-m), na.rm = T)/((nrow(xy)-1)*s2)
+}
+#lags <- seq(50,1000,50)
+#plot(lags, sapply(lags, acf2), type="l")
+lag=100
+shift.x <- sample(c(0,lag),size = nrow(xy), replace = T)
+shift.y <- lag-shift.x
+shift <- matrix(c(shift.x,shift.y), ncol = 2)
+xy$z2 <- st_extract(ras, as.matrix(xy[,1:2])+shift)[,1]
+s2 <- var(na.omit(c(xy$z, xy$z2)))
+m <- mean(na.omit(c(xy$z, xy$z2)))
+corr <- sum((xy$z-m)*(xy$z2-m), na.rm = T)/((nrow(xy)-1)*s2)
+ggplot(xy, aes(x=z, y=z2)) +
+  geom_point(size=.5) +
+  theme_bw() +
+  theme(axis.title = element_text(size=8),
+        title = element_text(size=7),
+        axis.text = element_text(size=6)) +
+  labs(x="Měření v nějakém místě",
+       y="Měření 100 m vedle",
+       title = bquote(italic(r)==.(round(corr, 2))))
+```
+
+:::
+:::{.column}
+```{r, echo=F, fig.height=1.7, fig.width=1.7}
+xy <- expand.grid(x = seq(st_bbox(ras)[1]+500,st_bbox(ras)[3]-500, l=10),
+                  y = seq(st_bbox(ras)[2]+500,st_bbox(ras)[4]-500, l=10))
+xy$z <- st_extract(ras, as.matrix(xy))[,1]
+xy <- filter(xy, !is.na(z))
+lag=1000
+shift.x <- sample(c(0,lag),size = nrow(xy), replace = T)
+shift.y <- lag-shift.x
+shift <- matrix(c(shift.x,shift.y), ncol = 2)
+xy$z2 <- st_extract(ras, as.matrix(xy[,1:2])+shift)[,1]
+s2 <- var(na.omit(c(xy$z, xy$z2)))
+m <- mean(na.omit(c(xy$z, xy$z2)))
+corr <- sum((xy$z-m)*(xy$z2-m), na.rm = T)/((nrow(xy)-1)*s2)
+ggplot(xy, aes(x=z, y=z2)) +
+  geom_point(size=.5) +
+  theme_bw() +
+  theme(axis.title = element_text(size=8),
+        title = element_text(size=7),
+        axis.text = element_text(size=6)) +
+  labs(x="Měření v nějakém místě",
+       y="Měření 1000 m vedle",
+       title = bquote(italic(r)==.(round(corr, 2))))
+```
+:::
+::::
+
+
+## Prostorová autokorelace
+\small
+
+Měření v prostoru:
+
+```{r, echo=F, out.height="30%"}
+library(stars)
+library(sf)
+library(raster)
+ras <- read_stars("data/dtm_CR.tif") %>%
+  st_set_crs(5514) %>%
+  st_crop(st_read("data/ArcCR500/AdministrativniCleneni_v13.gdb","ObcePolygony", quiet=T) %>% 
+            "["(400,))
+#  as("Raster") %>%
+#  persp(theta=120, phi=400, box=F, expand=0.3)
+knitr::include_graphics("terrain2.png")
+```
+
+Korelace jako funkce vzdálenosti:
+
+```{r, echo=F, fig.height=1, fig.width=3}
+lags <- seq(0, 1000, 100)
+tac <- sapply(lags, acf2)
+ggplot(data.frame(r=tac, lag=lags), aes(x=lag, y=r)) +
+  geom_line(size=.3) +
+  geom_point(size=.3) +
+  theme_bw() +
+  labs(x="Vzdálenost mezi měřeními", y=expression(italic(r))) +
+  theme(axis.title = element_text(angle=0, size=8),
+        axis.text = element_text(size=6))
+```
+
+- Předpoklad: prostorový proces je **stacionární** a **izotropní**!
+
+# Gaussovský proces a korelační funkce
+
+## Gaussovský (prostorový náhodný) proces
+\small
+
+Definice procesu...
+
+Kovarianční funkce...
+
+Korelační funkce...
+
+## Mocninně exponenicální třída
+
+::::{.columns}
+:::{.column width="30%"}
+$\rho(u)=exp[-(\frac{u}{\phi})^\kappa]$
+:::
+:::{.column width="70%"}
+\small
+$\phi$ ... scale, $\phi>0$
+
+$\kappa$ ... shape, $0<\kappa\le 2$
+:::
+::::
+
+::::{.columns}
+:::{.column width="50%"}
+```{r, echo=F, fig.height=2.5}
+pex <- function(x, nu, phi){ifelse(x==0, 1, exp(-(x/phi)^nu))}
+x <- seq(0, 1, l=200)
+data.frame(
+  x=rep(x,3),
+  y = c(
+    pex(x, 0.7, 0.16),
+    pex(x, 1.0, 0.25),
+    pex(x, 2.0, 0.43)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x)), rep("m3", length(x))),
+          levels=c("m1","m2","m3"))) %>%
+  ggplot(aes(x=x,y=y,lty=model)) + 
+  geom_line() +
+  scale_linetype_manual(values=1:3, 
+                        labels = c(bquote(kappa==0.7~phi==0.16),
+                                   bquote(kappa==1~phi==0.25),
+                                   bquote(kappa==2~phi==0.43))) +
+  labs(linetype="", x=bquote(u), y=bquote(rho(u))) +
+  theme_bw() +
+  theme(legend.position = c(.8,.8))
+```
+
+:::
+:::{.column width="50%"}
+
+:::
+::::
+
+## Matérn family
+\small
+
+```{r, echo=F, fig.height=2.5}
+matt <- function(x, nu, phi){if (x==0) {1} else 
+  {(2^(1-nu))*(gamma(nu)^(-1))*(x/phi)^nu*besselK((x/phi), nu)}}
+x <- seq(0, 1.5, l=200)
+df <- data.frame(
+  x=rep(x,3),
+  y = c(
+    matt(x, 0.5, 0.25),
+    matt(x, 1.5, 0.16),
+    matt(x, 2.5, 0.13)
+  ),
+  model=factor(c(rep("m1", length(x)), rep("m2", length(x)), rep("m3", length(x))),
+          levels=c("m1","m2","m3"),
+          labels = c(expression(\kappa=)))
+)
+
+library(ggplot2)
+ggplot(df, aes(x=x,y=y,lty=model)) + geom_line()
+```
+
+## Spherical family
+\small
+
+# Variogram
+
+## Variogram a semivariogram
+\small
+
+## Vztah mezi (semi)variogramem a korelační funkcí
+\small
+
+## Odhad variogramu z dat
+\small
+
+## Struktura variogramu
+\small
