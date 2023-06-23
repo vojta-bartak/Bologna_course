@@ -24,7 +24,7 @@ knitr::opts_chunk$set(echo = F, warning=F, message=F, cache=T)
 
 ## Spatial autocorrelation in ecology
 
-![](Conference_London/species.png)
+![](species.png)
 
 ## Spatial autocorrelation in ecology
 
