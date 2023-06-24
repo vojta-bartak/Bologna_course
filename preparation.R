@@ -135,3 +135,11 @@ tm_shape(krnap.subset) +
   tm_dots("localp", size=2)
 
 correlog(st_coordinates(krnap.subset), krnap.subset$residual, method = "Moran") %>% plot
+
+library(mgcv)
+mgam <- gam(richness~elev+s(X, Y), data=krnap)
+performance::check_overdispersion(mgam)
+
+png("spline_surf.png", res=300, width = 15,height = 10, units = "cm")
+plot(mgam)
+dev.off()
