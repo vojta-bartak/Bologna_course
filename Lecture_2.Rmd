@@ -1,0 +1,105 @@
+---
+title: 'Models for autocorrelated data'
+author: "Vojtěch Barták"
+date: "LS 2022"
+output:
+  beamer_presentation:  
+    incremental: false  
+    theme: "Frankfurt"  
+    colortheme: "beaver"  
+    toc: true   
+    slide_level: 3
+    keep_tex: true
+header-includes: 
+  - \AtBeginSubsection{} 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, cache=T)
+```
+
+# General overview
+
+## General model for spatial data
+\small
+
+$$\boldsymbol{Y}(\boldsymbol{s})=\boldsymbol{\mu}(\boldsymbol{s})+\boldsymbol{e}(\boldsymbol{s})$$ 
+
+$\boldsymbol{Y}$ ... vector of response observations    
+$\boldsymbol{s}$ ... vector of spatial coordinates    
+$\boldsymbol{\mu}$ ... deterministic mean function    
+$\boldsymbol{e}$ ... random "error" component
+
+The spatial structure observed in $\boldsymbol{Y}$ can be modelled:
+
+- in the **mean component**
+    - Spatially structured predictors (induced spatial structure)
+    - Autocovariate models
+    - Trend surface models
+    - Moran's eigenvector mapping
+- in the **random component**
+    - Geostatistical models
+    - Autoregressive models
+- both
+
+## Modeling spatial structure in the mean component
+\small
+
+Linear models:
+\begin{center}
+$\boldsymbol{\mu(\boldsymbol{s})} = \boldsymbol{X(\boldsymbol{s})}\boldsymbol{\beta}$,   $\boldsymbol{e(\boldsymbol{s})} \sim MVN(\boldsymbol{0}, \boldsymbol{diag(\sigma^2)})$
+\end{center}
+
+$\boldsymbol{X(\boldsymbol{s})}$ ... matrix of fixed predictors, including spatially structured ones   
+$\boldsymbol{\beta}$ ... vector of unknown parameters (fixed effects)
+
+- estimation by *ordinary least squares* (OLS)
+
+Generalized linear models:
+
+1. $Y_i$ are mutually independent, following a common distributional family (Gaussian, Poisson, Binomial, ...)
+2. $\boldsymbol{\mu(\boldsymbol{s})} = u[\boldsymbol{X(\boldsymbol{s})}\boldsymbol{\beta}]$, $u$ ... link function
+
+- estimation by maximum likelihood (ML)
+
+
+## Modeling spatial structure in the random component
+\small
+
+$$\boldsymbol{e} \sim (\boldsymbol{0}, \boldsymbol{\Sigma(\boldsymbol{\theta})})$$ 
+
+- $\boldsymbol{\Sigma}$ is a positive definite matrix with at least some non-zero off-diagonal elements
+- $\boldsymbol{\theta}$ is a vector o parameters describing the spatial dependence
+- Trying to capture the nature of spatial dependence - the real spatial autocorrelation
+- Relies on **stationarity** assumption
+- Fixed effects can estimated by *generalized least squares* (GLS)
+- Can be viewed as **mixed models** (estimation by ML/REML)
+
+# Models with correlated errors
+
+## Geostatistical linear model
+\small
+
+$$\boldsymbol{\mu(\boldsymbol{s})} = \boldsymbol{X(\boldsymbol{s})}\boldsymbol{\beta}$$
+$$\boldsymbol{e(\boldsymbol{s})} = \boldsymbol{S(\boldsymbol{s})}+\boldsymbol{\epsilon(\boldsymbol{s})}$$
+
+$\boldsymbol{S}(\boldsymbol{s})\sim MVN(\boldsymbol{0}, \boldsymbol{\Sigma})$ ... Gaussian process   
+$\boldsymbol{\Sigma} = (\sigma_{i,j})$, $\sigma_{i,j} = Cov(S_i, S_j) = C(u)$
+$\boldsymbol{\epsilon(\boldsymbol{s})} \sim MVN(\boldsymbol{0}, \boldsymbol{diag(\sigma^2)})$
+
+
+## Geostatistical GLM
+
+## Autoregressive models
+
+## Simultanuous autoregressive model
+
+## Conditional autoregressive model
+
+# Models with uncorrelated errors
+
+## Autocovariate models
+
+## Trend surface models
+
+## Moran's eigenvectors mapping
