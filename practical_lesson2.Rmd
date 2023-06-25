@@ -259,15 +259,24 @@ car::Anova(mod.gls)
 # anova(mod.gls, update(mod.gls, ~.-elev))
 ```
 
+To see the effect of the fixed predictors, we can again use the function `plot_model` from the package `sjPlot`.
+
 
 ```{r}
 plot_model(mod.gls, type="eff", terms="elev", show.data = T)
 ```
 
+Note the wider confidence bands compared to those obtained from the OLS model. This is the effect of accounting for the spatial autocorrelation, similarly as when using the modified t test of correlation coefficient instead of the standard one assuming independence.
+
+To see the explained variability of the model, we can call the function `r2` from the package `performance`. This generic function computes the appropriate versions of the R squared values for different types of models. 
+
+
 ```{r}
 r2(mod.gls)
 r2(mod.ols)
 ```
+
+Another way how to fit (generalized) linear mixed models with spatial effect is the package `spaMM`. The advantage compared to the `gls` function is that it can fit models for other than normally distributed responses.
 
 ```{r}
 mod.spaMM <- fitme(Jul~elev+Matern(1|x+y), data=prec.sf, fixed=list(nu=1.5))  
@@ -281,6 +290,8 @@ fixlrt <- fixedLRT(Jul~1+Matern(1|x+y), Jul~elev+Matern(1|x+y),
 summary(fixlrt,verbose=FALSE)
 
 ```
+
+Similar options are available in the package `glmmTMB`, which is another great package for fitting GLMM models, which also includes spatial random effects.
 
 ```{r}
 d <- prec.sf %>% mutate(pos = numFactor(prec.sf$x, prec.sf$y), group = factor(rep(1, nrow(prec.sf))))
@@ -302,22 +313,28 @@ plot_model(mod.TMB, type="eff", terms="elev", show.data=T)
 nb <- knn2nb(knearneigh(st_coordinates(prec.sf), k=12), sym=T)
 lw <- nb2listwdist(nb, prec.sf, type="idw", alpha=1)
 
-mod.sac <- sacsarlm(Jul~elev, data=prec.sf, listw = lw)
-summary(mod.sac)
-moran.mc(mod.sac$residuals, lw, 999)
-
-# 1 - logLik(mod.sar)/logLik(sacsarlm(Jul~1, data=prec.sf, listw = lw))
-
-mod.err <- errorsarlm(Jul~elev, data=prec.sf, listw = lw)
-summary(mod.err)
-moran.mc(mod.err$residuals, lw, 999)
+mod.sar <- spautolm(Jul~elev, data=prec.sf, listw = lw, family = "SAR")  
+summary(mod.sar)
+moran.mc(mod.sar$fit$residuals, lw, 999)
 
 mod.car <- spautolm(Jul~elev, data=prec.sf, listw = lw, family = "CAR")  
 summary(mod.car)
+moran.mc(mod.car$fit$residuals, lw, 999)
 
-mod.lag <- lagsarlm(Jul~elev, data=prec.sf, listw = lw)
-summary(mod.lag)
-moran.mc(mod.lag$residuals, lw, 999)
+# mod.sac <- sacsarlm(Jul~elev, data=prec.sf, listw = lw)
+# summary(mod.sac)
+# moran.mc(mod.sac$residuals, lw, 999)
+# 
+# # 1 - logLik(mod.sar)/logLik(sacsarlm(Jul~1, data=prec.sf, listw = lw))
+# 
+# mod.err <- errorsarlm(Jul~elev, data=prec.sf, listw = lw)
+# summary(mod.err)
+# moran.mc(mod.err$residuals, lw, 999)
+# 
+# mod.lag <- lagsarlm(Jul~elev, data=prec.sf, listw = lw)
+# summary(mod.lag)
+# moran.mc(mod.lag$residuals, lw, 999)
+
 ```
 
 
