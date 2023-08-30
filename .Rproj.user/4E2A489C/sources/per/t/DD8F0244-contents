@@ -1,0 +1,40 @@
+ ---
+title: 'Models for spatially autocorrelated data'
+author: "Vojtěch Barták"
+date: "LS 2022"
+output:
+  beamer_presentation:  
+    incremental: false  
+    theme: "Frankfurt"  
+    colortheme: "beaver"  
+    toc: true   
+    slide_level: 3
+    keep_tex: true
+header-includes: 
+  - \AtBeginSubsection{} 
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning=F, message=F, cache=T)
+```
+
+```{r, echo=F}
+library(tidyverse)
+```
+
+
+# General overview
+
+
+
+# Geostatistical models
+
+# Autoregression models
+
+# Autocovariate models
+
+# Trend-surface models
+
+# Moran's eigenvector mapping
+
+
