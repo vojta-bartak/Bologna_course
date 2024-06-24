@@ -9,9 +9,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE, message= FALSE, warning = FALSE)
 ```
 
-- prediction / interpolation
-- corrected effects and their significance
-- 
 
 ```{r}
 library(tidyverse) # General metapackage for manipuating and visualizing data
@@ -39,6 +36,8 @@ library(sjPlot)
 
 ### Reading and displaying the data
 
+We're gonna use data on monthly precipitation from meteorological stations in the Czech Republic, provided for free by the Czech Meteorological Institute. The data are from 2014, in the coordinate system routinely used in the region (S-JTSK Křovák, EPSG: 5514). We're gonna focus on July precipitation values, stored in the column Jul.
+
 ```{r}
 prec.sf <- st_read("data/precipitation_2014.shp") %>%
   st_transform(5514) %>%
@@ -56,6 +55,8 @@ tm_shape(regions %>% st_union) +
   tm_bubbles("Jul", title.size="Precipitation (mm)")
 ```
 
+We're also gonna use the elevation data at 1 km resolution. We're gonna load the DTM raster into a stars object, which can be plotted using `tmap` together with `sf` vector data.
+
 ```{r}
 dtm <- read_stars("data/dtm_CR_1000.tif")
 tm_shape(dtm) + 
@@ -69,6 +70,10 @@ tm_shape(dtm) +
 
 ### Examining the relationship with elevation
 
+To examine the relationship of precipitation and elevation, we first need to extract the elevation values into the data points where we have the precipitation values. This can be done by the function `st_extract`, which takes a `stars` object (raster) and an `sf` object (points), and returns a new point `sf` object with the raster values stored in a first column. Because we need just this one column, we pull it out from the data frame (function `pull` from `dplyr`). We then store this column as a new column named "elev" in the `prec.sf` object.
+
+We can then plot precipitation against elevation using `ggplot`.
+
 ```{r}
 prec.sf$elev <- st_extract(dtm, prec.sf) %>% pull(1)
 ggplot(prec.sf, aes(x=elev, y=Jul)) +
@@ -77,15 +82,23 @@ ggplot(prec.sf, aes(x=elev, y=Jul)) +
   labs(x="Elevation (m a. s.)", y="Precipitation (mm)")
 ```
 
+We see a clear, roughly linear relationship. To assess this relationship quantitatively, we can fit a linear model using ordinary least squares, i.e. so far ignoring the spatial autocorrelation.
+
 ```{r}
 # linear model
 mod.ols <- lm(Jul~elev, data=prec.sf)
 summary(mod.ols)
 ```
+
+The relationship is highly significant. To see the effect of elevation graphically, we can plot the model predictions together with the data. One option is to use the function `plot_model` from the package `sjPlot`.
+
 ```{r}
 plot_model(mod.ols, type="eff", terms="elev", show.data=T)
 ```
 
+We see the highly narrow confidence bands, which is in accordance with the high significance of the elevation effect. However, we do not know how much is this result affected by the ignored residual spatial autocorrelation.
+
+The first step to check the residual autocorrelation could be to plot the residuals in a map. In the following mode, we add three new columns into our data frame, one with the residuals, second with their absolute value, and the third with their sign. This enables us to plot their magnitude together with the information about their sign.
 
 ```{r}
 # residuals
@@ -102,17 +115,32 @@ tm_shape(regions %>% st_union) +
   tm_layout(legend.outside = T)
 ```
 
+We see a clear spatial structure in the residuals, suggesting there is still some residual autocorrelation. This can be formally checked using the methods introduced in the previous part. The methods based on Moran's I would require to construct the spatial neighbors and assign the spatial weights, so we skip this part at the moment. We will, however, test the residual autocorrelation repeatedly later.
+
 ## Correlation
+
+If we only need to assess the linear relationship between two continuous variables (like precipitation and elevation in our case), the simplest way is to test their correlation. In case of spatially autocorrelated data, a modification of the standard t test has been developed (Clifford and Richardson 1985) and is available in the package `SpatialPack`. Let's compare the standard Pearson's correlation test with the modified one.
 
 ```{r}
 cor.test(prec.sf$Jan, prec.sf$elev)
 modified.ttest(prec.sf$Jan, prec.sf$elev, st_coordinates(prec.sf))
 ```
 
+We see that the modification is only for the test, the correlation coefficient itself remains unchanged. The modification actually compensates for the pseudoreplication caused by spatial autocorrelation, and reduces the effective degrees of freedom from 632 to ca 89. The correlation is still significant, but the p value increased dramatically.
 
-## Generalized least squares
+For more complex situations, with possibly multiple predictors, non-linear relationships, and non-normally distributed data (e.g. disrete responses like presence/absence or counts), we need more sophisticated models. Let's start with some of these.
+
+## Geostatistical models
 
 ### `gstat` package and kriging
+
+The package `gstat` reflects the classical geostatistics with its focus on spatial prediction (e.g. spatial interpolation) instead of explanatory modeling. Also, it traditionally consisted of the following three steps:
+
+1. Visual examination of the sample variogram,
+2. Fitting a theoretical model to it,
+3. Using the fitted theoretical variogram to predict the values at unobserved locations (kriging).
+
+In the following code, we compute two sample variogram, the first from the precipitation values themselves, the second from the residuals after regressing them on the elevation.
 
 ```{r}
 vario <- variogram(Jul~1, prec.sf)
@@ -120,21 +148,47 @@ vario.elev <- variogram(Jul~elev, prec.sf)
 plot(vario); plot(vario.elev)
 ```
 
+We can see that both variograms have the typical shape of being near zero at the beginning and then increasing towards an asymptote. This indicates an obvious autocorrelation (remember that if you reverse tge variogram shape you obtain correlogram). The asymptote, called "sill", indicates the residual variance of the process. This variance is considerably smaller for the second variogram, because some part of the precipitation variation was explained by the elevation. The shape of the variogram, however, still suggest some residual autocorrelation that should be accounted for (or from the other point of view: that could be employed). 
+
+Now we try to fit some theoretical model to the sample variogram. Let's start with the traditionally ppular spherical model.
+
+
 ```{r}
 (vgm.elev = fit.variogram(vario.elev, model = vgm("Sph")))
 plot(vario.elev, vgm.elev)
 ```
+
+Although the fit looks visually good, the spherical model has only one parameter, the range, which is the value at which it reaches the sill (i.e. at which the autocorrelation decreases to zero). It is about 45 km in our case. Having only one parameter, the spherical model is not very flexible.
+
+Let's try another simple model, which is the exponential one.
+
 
 ```{r}
 (vgm.elev = fit.variogram(vario.elev, model = vgm("Exp")))
 plot(vario.elev, vgm.elev)
 ```
 
+We can see the fit is better for a bit larger distances. It should be noted that what we only seek is the satisfying fit at relatively small distances. This has two reasons. First, the autocorrelation usually operates at smaller distances and this is where we want to capture it, either to compensate for it in explanatory models, or to employ it for spatial interpolation. Second, the sample variogram is subject to greater uncertainty at larger distances, because of lower number of pairs of observations being separated by large distances.
+
+The much lower range parameter of the exponential variogram compared to the spherical one should not raise any concerns, it only reflects a different meaning of that parameter in the two respective models.
+
+Wey more flexible model is the Matérn variogram, which has an additional parameter, called *kappa*, controlling the smoothness of the process by shaping the curve at its very beginning. In the default setting of the `fit.variogram` function, however, this parameter is set to 0.5, which actually reproduce the exponential model. To let the value of the *kappa* parameter be estimated, we have to set `fit.kappa = TRUE`.
+
+```{r}
+(vgm.elev = fit.variogram(vario.elev, model = vgm("Mat"), fit.kappa = T))
+plot(vario.elev, vgm.elev)
+```
+
+We see that the resulting variogram is very close to the exponential model.
+
+It is soetimes useful to fit the variogram without the nugget effect. To achieve this, we have to set the starting value of all the variogram parameters in the `vgm` function, except the value for the nugget. Then the nugget will be automatically set to zero.
+
 ```{r}
 (vgm.elev.zero.nugget = fit.variogram(vario.elev, model = vgm(1.2, "Exp", 50000)))
 plot(vario.elev, vgm.elev.zero.nugget)
 ```
 
+Let's proceed to using the variogram for spatial interpolation. Before we do that, we first try to interpolate the precipitation values by conceptually similar, but much simpler method called Inverse Distant Weighting (IDW). It estimates the unknown values by computing a weighted average of the surrounding values, where the weights are inversely proportional to the distance from the given observation to the target point of estimation. Note that here the interpolation does not takes the relationships of precipitation and elevation into account.
 
 ```{r}
 pred.idw2.0 <- idw(Jul~1, prec.sf, newdata=dtm, idp=2)
@@ -170,6 +224,10 @@ plot.idw5.0 <- tm_shape(pred.idw5.0 %>% dplyr::select(var1.pred)) +
 tmap_arrange(plot.idw0.5,plot.idw2.0,plot.idw5.0)
 ```
 
+Now we use kriging to do the interpolation, and we employ the elevation into it. This is done by the function `krige` from the package `gstat`. The kriging prediction can be done directly in a raster, but the raster layer of the predictor value (here the elevation) must be named in the same way as in the variogram formula.
+
+Compared to IDW (and any other deterministic interpolation method), kriging not only provides the interpolated surface, but also an estimate of the corresponding uncertainty, the so called *kriging variance*. 
+
 
 ```{r}
 names(dtm) <- "elev"
@@ -185,6 +243,8 @@ tm_shape(pred.krig) +
 
 ### Mixed model approach
 
+We can fit linear models with correlated errors directly using generalized least squares by the `gls` function from the `nlme` package. It can accommodate few types of covariance functions to construct the general covariance matrix. In the following example, we again use the exponential covariance function with nugget effect.
+
 ```{r}
 mod.gls <- gls(Jul~elev, 
                data = prec.sf %>% st_drop_geometry, 
@@ -192,20 +252,31 @@ mod.gls <- gls(Jul~elev,
 summary(mod.gls)
 ```
 
+This model-based approach enables us to assess the significance of the predictors.
+
 ```{r}
 car::Anova(mod.gls)
 # anova(mod.gls, update(mod.gls, ~.-elev))
 ```
+
+To see the effect of the fixed predictors, we can again use the function `plot_model` from the package `sjPlot`.
 
 
 ```{r}
 plot_model(mod.gls, type="eff", terms="elev", show.data = T)
 ```
 
+Note the wider confidence bands compared to those obtained from the OLS model. This is the effect of accounting for the spatial autocorrelation, similarly as when using the modified t test of correlation coefficient instead of the standard one assuming independence.
+
+To see the explained variability of the model, we can call the function `r2` from the package `performance`. This generic function computes the appropriate versions of the R squared values for different types of models. 
+
+
 ```{r}
 r2(mod.gls)
 r2(mod.ols)
 ```
+
+Another way how to fit (generalized) linear mixed models with spatial effect is the package `spaMM`. The advantage compared to the `gls` function is that it can fit models for other than normally distributed responses.
 
 ```{r}
 mod.spaMM <- fitme(Jul~elev+Matern(1|x+y), data=prec.sf, fixed=list(nu=1.5))  
@@ -219,6 +290,8 @@ fixlrt <- fixedLRT(Jul~1+Matern(1|x+y), Jul~elev+Matern(1|x+y),
 summary(fixlrt,verbose=FALSE)
 
 ```
+
+Similar options are available in the package `glmmTMB`, which is another great package for fitting GLMM models, which also includes spatial random effects.
 
 ```{r}
 d <- prec.sf %>% mutate(pos = numFactor(prec.sf$x, prec.sf$y), group = factor(rep(1, nrow(prec.sf))))
@@ -240,22 +313,28 @@ plot_model(mod.TMB, type="eff", terms="elev", show.data=T)
 nb <- knn2nb(knearneigh(st_coordinates(prec.sf), k=12), sym=T)
 lw <- nb2listwdist(nb, prec.sf, type="idw", alpha=1)
 
-mod.sac <- sacsarlm(Jul~elev, data=prec.sf, listw = lw)
-summary(mod.sac)
-moran.mc(mod.sac$residuals, lw, 999)
-
-# 1 - logLik(mod.sar)/logLik(sacsarlm(Jul~1, data=prec.sf, listw = lw))
-
-mod.err <- errorsarlm(Jul~elev, data=prec.sf, listw = lw)
-summary(mod.err)
-moran.mc(mod.err$residuals, lw, 999)
+mod.sar <- spautolm(Jul~elev, data=prec.sf, listw = lw, family = "SAR")  
+summary(mod.sar)
+moran.mc(mod.sar$fit$residuals, lw, 999)
 
 mod.car <- spautolm(Jul~elev, data=prec.sf, listw = lw, family = "CAR")  
 summary(mod.car)
+moran.mc(mod.car$fit$residuals, lw, 999)
 
-mod.lag <- lagsarlm(Jul~elev, data=prec.sf, listw = lw)
-summary(mod.lag)
-moran.mc(mod.lag$residuals, lw, 999)
+# mod.sac <- sacsarlm(Jul~elev, data=prec.sf, listw = lw)
+# summary(mod.sac)
+# moran.mc(mod.sac$residuals, lw, 999)
+# 
+# # 1 - logLik(mod.sar)/logLik(sacsarlm(Jul~1, data=prec.sf, listw = lw))
+# 
+# mod.err <- errorsarlm(Jul~elev, data=prec.sf, listw = lw)
+# summary(mod.err)
+# moran.mc(mod.err$residuals, lw, 999)
+# 
+# mod.lag <- lagsarlm(Jul~elev, data=prec.sf, listw = lw)
+# summary(mod.lag)
+# moran.mc(mod.lag$residuals, lw, 999)
+
 ```
 
 
